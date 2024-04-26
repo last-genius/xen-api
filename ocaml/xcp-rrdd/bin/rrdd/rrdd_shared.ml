@@ -75,7 +75,11 @@ let use_min_max = ref false
 
 let mutex = Mutex.create ()
 
-type rrd_info = {rrd: Rrd.rrd; mutable dss: Ds.ds list; mutable domid: int}
+type rrd_info = {
+    rrd: Rrd.rrd
+  ; mutable dss: (float * Ds.ds) Rrd.StringMap.t
+  ; mutable domid: int
+}
 
 (* RRDs *)
 let vm_rrds : (string, rrd_info) Hashtbl.t = Hashtbl.create 32

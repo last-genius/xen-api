@@ -264,7 +264,7 @@ let create_multi prefixandrrds start interval cfopt =
       (List.map2
          (fun (prefix, rrd) rras ->
            let ds_legends =
-             Array.map (fun ds -> prefix ^ ds.ds_name) rrd.rrd_dss
+             Array.map (fun (_timestamp, ds) -> prefix ^ ds.ds_name) rrd.rrd_dss
            in
            let ds_legends_with_cf_prefix =
              Array.concat
