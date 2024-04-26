@@ -105,7 +105,7 @@ let update_rrds timestamp dss uuid_domids paused_vms =
     in
     OwnerMap.update owner merge all
   in
-  let dss = List.fold_left consolidate OwnerMap.empty dss in
+  let dss = Seq.fold_left consolidate OwnerMap.empty dss in
 
   (* the first parameter and ds.ds_name are equivalent *)
   let to_named_updates (_, ds) =
@@ -131,9 +131,7 @@ let update_rrds timestamp dss uuid_domids paused_vms =
            unreliable"
           by_how_much ;
       let process_vm vm_uuid dss =
-        let named_updates =
-          StringMap.to_seq dss |> Seq.map to_named_updates |> List.of_seq
-        in
+        let named_updates = StringMap.to_seq dss |> Seq.map to_named_updates in
         let dss = StringMap.to_seq dss |> Seq.map snd |> List.of_seq in
 
         match StringMap.find_opt vm_uuid uuid_domids with
@@ -163,9 +161,7 @@ let update_rrds timestamp dss uuid_domids paused_vms =
               __FUNCTION__ vm_uuid
       in
       let process_sr sr_uuid dss =
-        let named_updates =
-          StringMap.to_seq dss |> Seq.map to_named_updates |> List.of_seq
-        in
+        let named_updates = StringMap.to_seq dss |> Seq.map to_named_updates in
         let dss = StringMap.to_seq dss |> Seq.map snd |> List.of_seq in
         try
           (* First, potentially update the rrd with any new default dss *)
@@ -183,9 +179,7 @@ let update_rrds timestamp dss uuid_domids paused_vms =
         with _ -> log_backtrace ()
       in
       let process_host dss =
-        let named_updates =
-          StringMap.to_seq dss |> Seq.map to_named_updates |> List.of_seq
-        in
+        let named_updates = StringMap.to_seq dss |> Seq.map to_named_updates in
         let dss = StringMap.to_seq dss |> Seq.map snd |> List.of_seq in
 
         match !host_rrd with
