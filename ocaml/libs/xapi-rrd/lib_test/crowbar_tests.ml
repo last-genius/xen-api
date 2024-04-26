@@ -31,7 +31,7 @@ let in_range min max values =
  * Each archive (RRA) has a ring for each datasource (DS) *)
 let test_ranges rrd =
   let open Rrd in
-  let in_range_fring ds fring =
+  let in_range_fring (_timestamp, ds) fring =
     in_range ds.ds_min ds.ds_max (Fring.get fring)
   in
   let in_range_rra dss rra = Array.iter2 in_range_fring dss rra.rra_data in
@@ -74,14 +74,12 @@ let ds =
 let rrd =
   Cb.(map [list1 int64; rra; ds]) (fun values rra ds ->
       let open Rrd in
-      let init_time = 0. in
-
-      let rrd = rrd_create [|ds|] [|rra|] 5L init_time in
+      let rrd = rrd_create [|(0., ds)|] [|rra|] 5L in
 
       List.iteri
         (fun i v ->
-          let t = 5. *. (init_time +. float_of_int i) in
-          ds_update rrd t [|VT_Int64 v|] [|Fun.id|] (i = 0)
+          let timestamps = [|5. *. float_of_int i|] in
+          ds_update rrd timestamps [|VT_Int64 v|] [|Fun.id|] (i = 0)
         )
         values ;
       rrd
