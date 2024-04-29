@@ -24,6 +24,9 @@ val management_ip_error_to_string : management_ip_error -> string
 (** [management_ip_error err] returns a string representation of [err], useful
     only for logging. *)
 
+val ipaddr_to_cstruct : Ipaddr.t -> Cstruct.t
+(** [ipaddr_to_cstruct ip] returns the binary representation of [ip] *)
+
 val dns_names : unit -> string list
 (** [dns_names ()] returns a list of the hostnames that the host may have.
     Ignores empty names as well as "localhost" *)
