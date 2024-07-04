@@ -310,12 +310,12 @@ let wlb_request ~__context ~host ~port ~auth ~meth ~params ~handler ~enable_log
   in
   let pool_other_config = Db.Pool.get_other_config ~__context ~self:pool in
   let timeout =
-    try
-      if List.mem_assoc timeout_key pool_other_config then
-        float_of_string (List.assoc timeout_key pool_other_config)
-      else
-        timeout_default
-    with _ -> timeout_default
+    Option.value
+      (Option.bind (List.assoc_opt timeout_key pool_other_config) (fun x ->
+           float_of_string_opt x
+       )
+      )
+      ~default:timeout_default
   in
   if enable_log then
     debug "%s\n%s"
@@ -351,10 +351,9 @@ let wlb_request ~__context ~host ~port ~auth ~meth ~params ~handler ~enable_log
   | Unix.Unix_error (Unix.ECONNREFUSED, _, _) ->
       raise_connection_refused ()
 
-let perform_wlb_request ?auth ?url ?enable_log ~meth ~params ~handle_response
-    ~__context () =
+let perform_wlb_request ?auth ?url ?(enable_log = true) ~meth ~params
+    ~handle_response ~__context () =
   (* now assumes naming policy of xml repsonses is uniform Envelope->Body-> <x>Response-> <x>Result  where <x> is method name *)
-  let enable_log = match enable_log with Some b -> b | None -> true in
   let host, port =
     match url with
     | Some u ->
@@ -517,7 +516,7 @@ let init_wlb ~__context ~wlb_url ~wlb_username ~wlb_password ~xenserver_username
         )
   in
   Locking_helpers.Named_mutex.execute request_mutex
-    (perform_wlb_request ~enable_log:false ~meth:"AddXenServer" ~params
+    (perform_wlb_request ~enable_log:true ~meth:"AddXenServer" ~params
        ~auth:(encoded_auth wlb_username wlb_password)
        ~url:wlb_url ~handle_response ~__context
     )
