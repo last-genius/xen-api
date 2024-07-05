@@ -28,14 +28,10 @@ jobs:
         run: sudo apt-get update
 
       - name: Use ocaml
-        uses: ocaml/setup-ocaml@v2
+        uses: ./.github/workflows/setup-xapi-ocaml
         with:
-          ocaml-compiler: ${{ steps.dotenv.outputs.ocaml_version_full }}
-          opam-repositories: |
-            xs-opam: ${{ steps.dotenv.outputs.repository }}
-
-      - name: Install dependencies
-        run: opam pin list --short | xargs opam install --deps-only -v
+          ocaml_version_full: ${{ steps.dotenv.outputs.ocaml_version_full }}
+          repository: ${{ steps.dotenv.outputs.repository }}
 
       - name: Generate xapi-storage docs
         run: |

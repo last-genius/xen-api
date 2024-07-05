@@ -1,0 +1,37 @@
+name: Setup OCaml environment for XenAPI.
+
+inputs:
+  ocaml_version_full:
+    required: true
+  repository:
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Cache
+      id: cache-opam
+      uses: actions/cache@v3
+      env:
+        cache-name: cache-opam
+      with:
+        path: |
+          /home/runner/work/xen-api/xen-api/_opam
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.opam') }}
+
+    # We set DUNE_CACHE_STORAGE_MODE, it is required for dune cache to work inside opam for now,
+    # otherwise it gets EXDEV and considers it a cache miss
+    - name: Use ocaml
+      if: steps.cache-opam.outputs.cache-hit != 'true'
+      uses: ocaml/setup-ocaml@v2
+      with:
+        ocaml-compiler: ${{ inputs.ocaml_version_full}}
+        opam-repositories: |
+          xs-opam: ${{ inputs.repository }}
+        dune-cache: true
+      #env:
+        #DUNE_CACHE_STORAGE_MODE: copy
+
+    - name: Install dependencies
+      if: steps.cache-opam.outputs.cache-hit != 'true'
+      shell: bash
+      run: opam install . --deps-only --with-test -v
