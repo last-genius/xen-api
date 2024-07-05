@@ -1,0 +1,27 @@
+name: Semgrep Quality Gate
+
+on:
+  # Scan changed files in PRs (diff-aware scanning):
+  pull_request: {}
+  # Scan on-demand through GitHub Actions interface:
+  workflow_dispatch: {}
+  # Scan mainline branches and report all findings:
+  push:
+    branches: ["master"]
+  # Schedule the CI job (this method uses cron syntax):
+  schedule:
+    - cron: '59 23 * * *' # Sets Semgrep to scan every day at 23:59 UTC.
+
+jobs:
+  semgrep:
+    name: semgrep-oss/quality-gate
+    runs-on: ubuntu-latest
+
+    container:
+      # A Docker image with Semgrep installed. Do not change this.
+      image: semgrep/semgrep
+
+    steps:
+      - uses: actions/checkout@v4
+      # Runs 'semgrep scan' on the rules in quality-gate.semgrep
+      - run: semgrep scan --config quality-gate.semgrep --autofix --dryrun

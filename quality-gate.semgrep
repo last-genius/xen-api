@@ -1,0 +1,13 @@
+rules:
+  - id: ocamllint-length-list-zero
+    pattern: List.length $X = 0
+    fix: $X = []
+    message: You probably want $X = [], which is faster.
+    languages:
+      - ocaml
+    severity: WARNING
+    metadata:
+      category: performance
+      technology:
+        - ocaml
+      license: Commons Clause License Condition v1.0[LGPL-2.1-only]
