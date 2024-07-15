@@ -23,6 +23,8 @@ module Unixext = Xapi_stdext_unix.Unixext
 
 let finally = Xapi_stdext_pervasives.Pervasiveext.finally
 
+let check_exn = Xapi_stdext_pervasives.Pervasiveext.check_exn
+
 open Auth_signature
 open Extauth
 open Xapi_database
@@ -180,12 +182,11 @@ let register_callback_fns () =
             ~expr:(Eq (Field "address", Literal addr))
         in
         match hosts with
-        | [host] -> (
-          try
-            Message_forwarding.check_live ~__context host ;
-            true
-          with _ -> false
-        )
+        | [host] ->
+            check_exn (fun () ->
+                Message_forwarding.check_live ~__context host ;
+                true
+            )
         | _ ->
             true
     )
@@ -803,10 +804,10 @@ let handle_licensing () =
 let startup_script () =
   let startup_script_hook = !Xapi_globs.startup_script_hook in
   if
-    try
-      Unix.access startup_script_hook [Unix.X_OK] ;
-      true
-    with _ -> false
+    check_exn (fun () ->
+        Unix.access startup_script_hook [Unix.X_OK] ;
+        true
+    )
   then (
     debug "Executing startup script: %s" startup_script_hook ;
     ignore (Forkhelpers.execute_command_get_output startup_script_hook [])

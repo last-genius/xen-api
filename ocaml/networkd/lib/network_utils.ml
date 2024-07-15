@@ -180,16 +180,16 @@ module Sysfs = struct
       raise (Network_error (Write_error file))
 
   let is_physical name =
-    try
-      let devpath = getpath name "device" in
-      let driver_link = Unix.readlink (devpath ^ "/driver") in
-      (* filter out symlinks under device/driver which look like
-         /../../../devices/xen-backend/vif- *)
-      not
-        (List.mem "xen-backend"
-           (Astring.String.cuts ~empty:false ~sep:"/" driver_link)
-        )
-    with _ -> false
+    Pervasiveext.check_exn (fun () ->
+        let devpath = getpath name "device" in
+        let driver_link = Unix.readlink (devpath ^ "/driver") in
+        (* filter out symlinks under device/driver which look like
+           /../../../devices/xen-backend/vif- *)
+        not
+          (List.mem "xen-backend"
+             (Astring.String.cuts ~empty:false ~sep:"/" driver_link)
+          )
+    )
 
   (* device types are defined in linux/if_arp.h *)
   let is_ether_device name =
@@ -203,7 +203,9 @@ module Sysfs = struct
 
   let list () =
     let is_dir name =
-      try Sys.is_directory ("/sys/class/net/" ^ name) with _ -> false
+      Pervasiveext.check_exn (fun () ->
+          Sys.is_directory ("/sys/class/net/" ^ name)
+      )
     in
     Sys.readdir "/sys/class/net"
     |> Array.to_list
@@ -216,10 +218,10 @@ module Sysfs = struct
       raise (Network_error (Interface_does_not_exist dev))
 
   let get_carrier name =
-    try
-      let i = int_of_string (read_one_line (getpath name "carrier")) in
-      match i with 1 -> true | 0 -> false | _ -> false
-    with _ -> false
+    Pervasiveext.check_exn (fun () ->
+        let i = int_of_string (read_one_line (getpath name "carrier")) in
+        match i with 1 -> true | 0 -> false | _ -> false
+    )
 
   let get_pcibuspath name =
     try
@@ -474,7 +476,8 @@ module Ip = struct
     let flags = String.sub output (i + 1) (j - i - 1) in
     Astring.String.cuts ~empty:false ~sep:"," flags
 
-  let is_up dev = try List.mem "UP" (get_link_flags dev) with _ -> false
+  let is_up dev =
+    Pervasiveext.check_exn (fun () -> List.mem "UP" (get_link_flags dev))
 
   let link_set dev args =
     Sysfs.assert_exists dev ;
@@ -725,18 +728,18 @@ module Linux_bonding = struct
     with _ -> error "Failed to load bonding driver"
 
   let bonding_driver_loaded () =
-    try
-      Unix.access bonding_masters [Unix.F_OK] ;
-      true
-    with _ -> false
+    Pervasiveext.check_exn (fun () ->
+        Unix.access bonding_masters [Unix.F_OK] ;
+        true
+    )
 
   let is_bond_device name =
-    try
-      List.exists (( = ) name)
-        (Astring.String.cuts ~empty:false ~sep:" "
-           (Sysfs.read_one_line bonding_masters)
-        )
-    with _ -> false
+    Pervasiveext.check_exn (fun () ->
+        List.exists (( = ) name)
+          (Astring.String.cuts ~empty:false ~sep:" "
+             (Sysfs.read_one_line bonding_masters)
+          )
+    )
 
   (** Ensures that a bond master device exists in the kernel. *)
   let add_bond_master name =
@@ -1156,11 +1159,11 @@ module Proc = struct
       []
 
   let get_ipv6_disabled () =
-    try
-      Unixext.string_of_file "/proc/sys/net/ipv6/conf/all/disable_ipv6"
-      |> String.trim
-      |> ( = ) "1"
-    with _ -> false
+    Pervasiveext.check_exn (fun () ->
+        Unixext.string_of_file "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+        |> String.trim
+        |> ( = ) "1"
+    )
 end
 
 module Ovs = struct
@@ -1424,11 +1427,12 @@ module Ovs = struct
       with _ -> []
 
     let get_mcast_snooping_enable ~name =
-      try
-        vsctl ~log:false ["--"; "get"; "bridge"; name; "mcast_snooping_enable"]
-        |> String.trim
-        |> bool_of_string
-      with _ -> false
+      Pervasiveext.check_exn (fun () ->
+          vsctl ~log:false
+            ["--"; "get"; "bridge"; name; "mcast_snooping_enable"]
+          |> String.trim
+          |> bool_of_string
+      )
 
     let inject_igmp_query ~name =
       try
@@ -1578,11 +1582,11 @@ module Ovs = struct
       in
       let del_old_arg =
         let real_bridge_exists () =
-          try
-            (* `ovs-vsctl br-to-parent <name>` returns <name> if <name> is a
-               current "real" bridge *)
-            vsctl ~log:false ["br-to-parent"; name] |> String.trim = name
-          with _ -> false
+          Pervasiveext.check_exn (fun () ->
+              (* `ovs-vsctl br-to-parent <name>` returns <name> if <name> is a
+                 current "real" bridge *)
+              vsctl ~log:false ["br-to-parent"; name] |> String.trim = name
+          )
         in
         if vlan <> None && real_bridge_exists () then
           (* This is to handle the case that a "real" bridge (not a "fake" VLAN

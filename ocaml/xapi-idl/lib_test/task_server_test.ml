@@ -1,3 +1,5 @@
+let check_exn = Xapi_stdext_pervasives.Pervasiveext.check_exn
+
 let assert_bool msg = Alcotest.(check bool) msg true
 
 module TestInterface = struct
@@ -118,12 +120,11 @@ let test_raise () =
   let t' = T.to_interface_task task in
   assert_bool "Task result"
     ( match t'.TestInterface.Task.state with
-    | TestInterface.Task.Failed r -> (
-      try
-        let s = TestInterface.Exception.exnty_of_rpc r in
-        s = TestInterface.Exception.Internal_error "test"
-      with _ -> false
-    )
+    | TestInterface.Task.Failed r ->
+        check_exn (fun () ->
+            let s = TestInterface.Exception.exnty_of_rpc r in
+            s = TestInterface.Exception.Internal_error "test"
+        )
     | _ ->
         false
     )
@@ -138,12 +139,11 @@ let test_cancel () =
   T.run task ;
   assert_bool "Task result"
     ( match (T.to_interface_task task).TestInterface.Task.state with
-    | TestInterface.Task.Failed r -> (
-      try
-        let e = TestInterface.Exception.exnty_of_rpc r in
-        e = TestInterface.Exception.Cancelled id
-      with _ -> false
-    )
+    | TestInterface.Task.Failed r ->
+        check_exn (fun () ->
+            let e = TestInterface.Exception.exnty_of_rpc r in
+            e = TestInterface.Exception.Cancelled id
+        )
     | _ ->
         false
     )
@@ -165,12 +165,11 @@ let test_with_cancel () =
   T.run task ;
   assert_bool "Task result"
     ( match (T.to_interface_task task).TestInterface.Task.state with
-    | TestInterface.Task.Failed r -> (
-      try
-        let e = TestInterface.Exception.exnty_of_rpc r in
-        e = TestInterface.Exception.Cancelled id
-      with _ -> false
-    )
+    | TestInterface.Task.Failed r ->
+        check_exn (fun () ->
+            let e = TestInterface.Exception.exnty_of_rpc r in
+            e = TestInterface.Exception.Cancelled id
+        )
     | _ ->
         false
     ) ;
@@ -190,12 +189,11 @@ let test_with_cancel_failure () =
   T.run task ;
   assert_bool "Task result"
     ( match (T.to_interface_task task).TestInterface.Task.state with
-    | TestInterface.Task.Failed r -> (
-      try
-        let e = TestInterface.Exception.exnty_of_rpc r in
-        e = TestInterface.Exception.Cancelled id
-      with _ -> false
-    )
+    | TestInterface.Task.Failed r ->
+        check_exn (fun () ->
+            let e = TestInterface.Exception.exnty_of_rpc r in
+            e = TestInterface.Exception.Cancelled id
+        )
     | _ ->
         false
     )
@@ -225,12 +223,11 @@ let test_with_cancel2 () =
   Thread.join th ;
   assert_bool "Task result"
     ( match (T.to_interface_task task).TestInterface.Task.state with
-    | TestInterface.Task.Failed r -> (
-      try
-        let e = TestInterface.Exception.exnty_of_rpc r in
-        e = TestInterface.Exception.Cancelled id
-      with _ -> false
-    )
+    | TestInterface.Task.Failed r ->
+        check_exn (fun () ->
+            let e = TestInterface.Exception.exnty_of_rpc r in
+            e = TestInterface.Exception.Cancelled id
+        )
     | _ ->
         false
     ) ;
@@ -260,12 +257,11 @@ let test_with_cancel_failure2 () =
   Thread.join th ;
   assert_bool "Task result"
     ( match (T.to_interface_task task).TestInterface.Task.state with
-    | TestInterface.Task.Failed r -> (
-      try
-        let e = TestInterface.Exception.exnty_of_rpc r in
-        e = TestInterface.Exception.Cancelled id
-      with _ -> false
-    )
+    | TestInterface.Task.Failed r ->
+        check_exn (fun () ->
+            let e = TestInterface.Exception.exnty_of_rpc r in
+            e = TestInterface.Exception.Cancelled id
+        )
     | _ ->
         false
     )
@@ -361,12 +357,11 @@ let test_cancel_trigger () =
   T.run task2 ;
   assert_bool "Task result"
     ( match (T.to_interface_task task2).TestInterface.Task.state with
-    | TestInterface.Task.Failed r -> (
-      try
-        let e = TestInterface.Exception.exnty_of_rpc r in
-        e = TestInterface.Exception.Cancelled id2
-      with _ -> false
-    )
+    | TestInterface.Task.Failed r ->
+        check_exn (fun () ->
+            let e = TestInterface.Exception.exnty_of_rpc r in
+            e = TestInterface.Exception.Cancelled id2
+        )
     | _ ->
         false
     ) ;

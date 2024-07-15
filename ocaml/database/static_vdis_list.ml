@@ -17,6 +17,8 @@
 
 open Xapi_stdext_unix
 
+let check_exn = Xapi_stdext_pervasives.Pervasiveext.check_exn
+
 (** Represents the configuration of a static (ie attached on boot) vdi *)
 type vdi = {
     uuid: string
@@ -42,16 +44,18 @@ let list () =
       let reason = Unixext.string_of_file (Filename.concat path "reason") in
       (* let bool_of_string x = String.lowercase_ascii x = "true" in *)
       let delete_next_boot =
-        try
-          ignore (Unix.stat (Filename.concat path "delete-next-boot")) ;
-          true
-        with _ -> false
+        check_exn (fun () ->
+            let (_ : Unix.stats) =
+              Unix.stat (Filename.concat path "delete-next-boot")
+            in
+            true
+        )
       in
       let currently_attached =
-        try
-          ignore (Unix.stat (Filename.concat path "disk")) ;
-          true
-        with _ -> false
+        check_exn (fun () ->
+            let (_ : Unix.stats) = Unix.stat (Filename.concat path "disk") in
+            true
+        )
       in
       let path =
         try Some (Unix.readlink (Filename.concat path "disk")) with _ -> None

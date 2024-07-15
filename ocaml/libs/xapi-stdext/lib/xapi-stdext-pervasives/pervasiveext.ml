@@ -40,10 +40,10 @@ let finally fct clean_f =
   in
   clean_f () ; result
 
-(** execute fct ignoring exceptions *)
 let ignore_exn fct = try fct () with _ -> ()
 
-(* non polymorphic ignore function *)
+let check_exn fct = try fct () with _ -> false
+
 let ignore_int v =
   let (_ : int) = v in
   ()

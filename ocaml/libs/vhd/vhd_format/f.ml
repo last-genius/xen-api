@@ -12,6 +12,8 @@
  * GNU Lesser General Public License for more details.
  *)
 
+let check_exn = Xapi_stdext_pervasives.Pervasiveext.check_exn
+
 (* VHD manipulation *)
 
 let sector_size = 512
@@ -30,14 +32,14 @@ exception Cstruct_differ
 
 let cstruct_equal a b =
   let check_contents a b =
-    try
-      for i = 0 to Cstruct.length a - 1 do
-        let a' = Cstruct.get_char a i in
-        let b' = Cstruct.get_char b i in
-        if a' <> b' then raise Cstruct_differ
-      done ;
-      true
-    with _ -> false
+    check_exn (fun () ->
+        for i = 0 to Cstruct.length a - 1 do
+          let a' = Cstruct.get_char a i in
+          let b' = Cstruct.get_char b i in
+          if a' <> b' then raise Cstruct_differ
+        done ;
+        true
+    )
   in
   Cstruct.length a = Cstruct.length b && check_contents a b
 
@@ -870,15 +872,18 @@ module Header = struct
     && a.parent_time_stamp = b.parent_time_stamp
     && a.parent_unicode_name = b.parent_unicode_name
     && Array.length a.parent_locators = Array.length b.parent_locators
-    &&
-    try
-      for i = 0 to Array.length a.parent_locators - 1 do
-        if not (Parent_locator.equal a.parent_locators.(i) b.parent_locators.(i))
-        then
-          raise Not_found (* arbitrary exn *)
-      done ;
-      true
-    with _ -> false
+    && check_exn (fun () ->
+           for i = 0 to Array.length a.parent_locators - 1 do
+             if
+               not
+                 (Parent_locator.equal a.parent_locators.(i)
+                    b.parent_locators.(i)
+                 )
+             then
+               raise Not_found (* arbitrary exn *)
+           done ;
+           true
+       )
 
   let set_parent t filename =
     let parent_locators = Parent_locator.from_filename filename in

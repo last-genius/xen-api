@@ -2,7 +2,13 @@
   (name test_lib)
   (modules idl_test_common)
   (libraries
-    (re_export alcotest) xapi-idl (re_export rpclib.core) rpclib.json rpclib.xml result)
+    (re_export alcotest)
+    xapi-idl
+    xapi-stdext-pervasives
+    (re_export rpclib.core)
+    rpclib.json
+    rpclib.xml
+    result)
   (wrapped false)
 )
 

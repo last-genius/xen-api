@@ -363,16 +363,16 @@ let filter_records_on_set_param records (k, v) s =
       | None ->
           failwith (Printf.sprintf "Records broken (field %s)" s)
     in
-    try
-      let set = get_set () in
-      let set, v =
-        if field.case_insensitive then
-          (List.map String.lowercase_ascii set, String.lowercase_ascii v)
-        else
-          (set, v)
-      in
-      List.exists (fun member -> v = member) set
-    with _ -> false
+    check_exn (fun () ->
+        let set = get_set () in
+        let set, v =
+          if field.case_insensitive then
+            (List.map String.lowercase_ascii set, String.lowercase_ascii v)
+          else
+            (set, v)
+        in
+        List.exists (fun member -> v = member) set
+    )
   in
   List.filter filterfn records
 
@@ -389,19 +389,19 @@ let filter_records_on_map_param records (k, v) s =
       | None ->
           failwith (Printf.sprintf "Records broken (field %s)" s)
     in
-    try
-      let map = get_map () in
-      let map, key, v =
-        if field.case_insensitive then
-          ( List.map (fun (k, v) -> (String.lowercase_ascii k, v)) map
-          , String.lowercase_ascii key
-          , String.lowercase_ascii v
-          )
-        else
-          (map, key, v)
-      in
-      List.mem_assoc key map && List.assoc key map = v
-    with _ -> false
+    check_exn (fun () ->
+        let map = get_map () in
+        let map, key, v =
+          if field.case_insensitive then
+            ( List.map (fun (k, v) -> (String.lowercase_ascii k, v)) map
+            , String.lowercase_ascii key
+            , String.lowercase_ascii v
+            )
+          else
+            (map, key, v)
+        in
+        List.mem_assoc key map && List.assoc key map = v
+    )
   in
   List.filter filterfn records
 
@@ -6290,10 +6290,10 @@ let diagnostic_license_status printer rpc session_id _params =
   let valid, invalid =
     List.partition
       (fun (host, _) ->
-        try
-          ignore (license_of_host rpc session_id host) ;
-          true
-        with _ -> false
+        check_exn (fun () ->
+            let (_ : host_license) = license_of_host rpc session_id host in
+            true
+        )
       )
       hosts
   in

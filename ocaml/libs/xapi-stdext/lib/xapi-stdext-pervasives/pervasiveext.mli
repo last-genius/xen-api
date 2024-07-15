@@ -17,7 +17,13 @@ val finally : (unit -> 'a) -> (unit -> unit) -> 'a
     [g ()] even if [f ()] throws an exception. *)
 
 val ignore_exn : (unit -> unit) -> unit
+(** [ignore_exn fct] executes fct, ignoring exceptions *)
 
+val check_exn : (unit -> bool) -> bool
+(** [check_exn fct] returns [fct ()] if it doesn't raise exceptions
+    and [false] otherwise *)
+
+(* non polymorphic ignore functions *)
 val ignore_int : int -> unit
 
 val ignore_int32 : int32 -> unit

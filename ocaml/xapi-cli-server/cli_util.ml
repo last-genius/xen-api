@@ -26,6 +26,8 @@ open Client
 
 let finally = Xapi_stdext_pervasives.Pervasiveext.finally
 
+let check_exn = Xapi_stdext_pervasives.Pervasiveext.check_exn
+
 let log_exn_continue msg f x =
   try f x
   with e -> debug "Ignoring exception: %s while %s" (Printexc.to_string e) msg

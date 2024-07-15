@@ -223,29 +223,29 @@ let symlinks _ref gen message basefilename =
 (** Check to see if the UUID is valid. This should not use get_by_uuid as
     	this causes spurious exceptions to be logged... *)
 let check_uuid ~__context ~cls ~uuid =
-  try
-    ( match cls with
-    | `VM ->
-        ignore (Db.VM.get_by_uuid ~__context ~uuid)
-    | `Host ->
-        ignore (Db.Host.get_by_uuid ~__context ~uuid)
-    | `SR ->
-        ignore (Db.SR.get_by_uuid ~__context ~uuid)
-    | `Pool ->
-        ignore (Db.Pool.get_by_uuid ~__context ~uuid)
-    | `VMPP ->
-        ignore (Db.VMPP.get_by_uuid ~__context ~uuid)
-    | `VMSS ->
-        ignore (Db.VMSS.get_by_uuid ~__context ~uuid)
-    | `PVS_proxy ->
-        ignore (Db.PVS_proxy.get_by_uuid ~__context ~uuid)
-    | `VDI ->
-        ignore (Db.VDI.get_by_uuid ~__context ~uuid)
-    | `Certificate ->
-        ignore (Db.Certificate.get_by_uuid ~__context ~uuid)
-    ) ;
-    true
-  with _ -> false
+  Pervasiveext.check_exn (fun () ->
+      ( match cls with
+      | `VM ->
+          ignore (Db.VM.get_by_uuid ~__context ~uuid)
+      | `Host ->
+          ignore (Db.Host.get_by_uuid ~__context ~uuid)
+      | `SR ->
+          ignore (Db.SR.get_by_uuid ~__context ~uuid)
+      | `Pool ->
+          ignore (Db.Pool.get_by_uuid ~__context ~uuid)
+      | `VMPP ->
+          ignore (Db.VMPP.get_by_uuid ~__context ~uuid)
+      | `VMSS ->
+          ignore (Db.VMSS.get_by_uuid ~__context ~uuid)
+      | `PVS_proxy ->
+          ignore (Db.PVS_proxy.get_by_uuid ~__context ~uuid)
+      | `VDI ->
+          ignore (Db.VDI.get_by_uuid ~__context ~uuid)
+      | `Certificate ->
+          ignore (Db.Certificate.get_by_uuid ~__context ~uuid)
+      ) ;
+      true
+  )
 
 (*********** Thread_queue to exec the message script hook ***********)
 
@@ -316,10 +316,10 @@ let write ~__context ~_ref ~message =
   (* Check if a message with _ref has already been written *)
   let message_exists () =
     let file = ref_symlink () ^ "/" ^ Ref.string_of _ref in
-    try
-      Unix.access file [Unix.F_OK] ;
-      true
-    with _ -> false
+    Pervasiveext.check_exn (fun () ->
+        Unix.access file [Unix.F_OK] ;
+        true
+    )
   in
   let message_gen () =
     let fn = ref_symlink () ^ "/" ^ Ref.string_of _ref in
@@ -509,15 +509,15 @@ let destroy ~__context ~self =
       try
         List.find
           (fun msg_fname ->
-            try
-              let ic = open_in msg_fname in
-              let _, _ref, _ =
-                Pervasiveext.finally
-                  (fun () -> of_xml (Xmlm.make_input (`Channel ic)))
-                  (fun () -> close_in ic)
-              in
-              if _ref = self then true else false
-            with _ -> false
+            Pervasiveext.check_exn (fun () ->
+                let ic = open_in msg_fname in
+                let _, _ref, _ =
+                  Pervasiveext.finally
+                    (fun () -> of_xml (Xmlm.make_input (`Channel ic)))
+                    (fun () -> close_in ic)
+                in
+                if _ref = self then true else false
+            )
           )
           allmsgs
       with _ ->
@@ -539,10 +539,10 @@ let destroy_many ~__context ~messages =
 let gc ~__context =
   let message_limit = !Xapi_globs.message_limit in
   if
-    try
-      Unix.access message_dir [Unix.F_OK] ;
-      true
-    with _ -> false
+    Pervasiveext.check_exn (fun () ->
+        Unix.access message_dir [Unix.F_OK] ;
+        true
+    )
   then
     let allmsg =
       List.filter_map
@@ -605,21 +605,21 @@ let get_real_inner dir filter name_filter =
 (* Message directory missing *)
 
 let since_name_filter since name =
-  try float_of_string name > since with _ -> false
+  Pervasiveext.check_exn (fun () -> float_of_string name > since)
 
 let get_from_generation gen =
   if gen > 0L then
     get_real_inner (gen_symlink ())
       (fun _ -> true)
-      (fun n -> try Int64.of_string n > gen with _ -> false)
+      (fun n -> Pervasiveext.check_exn (fun () -> Int64.of_string n > gen))
   else
     get_real_inner message_dir
       (fun _ -> true)
       (fun n ->
-        try
-          ignore (float_of_string n) ;
-          true
-        with _ -> false
+        Pervasiveext.check_exn (fun () ->
+            let (_ : float) = float_of_string n in
+            true
+        )
       )
 
 let get_real dir filter since =
@@ -738,10 +738,10 @@ let repopulate_cache () =
         get_real_inner message_dir
           (fun _ -> true)
           (fun n ->
-            try
-              ignore (float_of_string n) ;
-              true
-            with _ -> false
+            Pervasiveext.check_exn (fun () ->
+                let (_ : float) = float_of_string n in
+                true
+            )
           )
       in
       let last_256 = Listext.List.take 256 messages in

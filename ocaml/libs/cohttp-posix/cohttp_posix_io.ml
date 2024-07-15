@@ -15,6 +15,8 @@
  *
  *)
 
+let check_exn = Xapi_stdext_pervasives.Pervasiveext.check_exn
+
 module Unbuffered_IO = struct
   (** Use as few Unix.\{read,write\} calls as we can (for efficiency) without
       explicitly buffering the stream beyond the HTTP headers. This will allow
@@ -154,10 +156,10 @@ module Buffered_IO = struct
     with End_of_file -> None
 
   let read_into_exactly ic buf ofs len =
-    try
-      really_input ic buf ofs len ;
-      true
-    with _ -> false
+    check_exn (fun () ->
+        really_input ic buf ofs len ;
+        true
+    )
 
   let read_exactly ic len =
     let buf = Bytes.create len in

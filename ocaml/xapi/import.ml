@@ -300,11 +300,11 @@ let assert_can_live_import_vgpu ~__context vgpu_record =
   let capacity_exists =
     List.exists
       (fun pgpu ->
-        try
-          Xapi_pgpu_helpers.assert_capacity_exists_for_VGPU_type ~__context
-            ~self:pgpu ~vgpu_type:vgpu_record.API.vGPU_type ;
-          true
-        with _ -> false
+        check_exn (fun () ->
+            Xapi_pgpu_helpers.assert_capacity_exists_for_VGPU_type ~__context
+              ~self:pgpu ~vgpu_type:vgpu_record.API.vGPU_type ;
+            true
+        )
       )
       local_pgpus
   in
@@ -444,10 +444,10 @@ module VM : HandlerTools = struct
             Db.VM.get_by_uuid ~__context ~uuid:vm_record.API.vM_uuid
           in
           let vm_uuid_exists () =
-            try
-              ignore (get_vm_by_uuid ()) ;
-              true
-            with _ -> false
+            check_exn (fun () ->
+                let (_ : [`VM] Ref.t) = get_vm_by_uuid () in
+                true
+            )
           in
           (* If full_restore is true then we want to keep the VM uuid - this may involve replacing an existing VM. *)
           if config.full_restore && vm_uuid_exists () then
@@ -1291,10 +1291,10 @@ module VBD : HandlerTools = struct
       Client.VBD.get_by_uuid ~rpc ~session_id ~uuid:vbd_record.API.vBD_uuid
     in
     let vbd_exists () =
-      try
-        ignore (get_vbd ()) ;
-        true
-      with _ -> false
+      check_exn (fun () ->
+          let (_ : [> `VBD] Ref.t) = get_vbd () in
+          true
+      )
     in
     if config.full_restore && vbd_exists () then
       let vbd = get_vbd () in
@@ -1419,10 +1419,10 @@ module VIF : HandlerTools = struct
       Client.VIF.get_by_uuid ~rpc ~session_id ~uuid:vif_record.API.vIF_uuid
     in
     let vif_exists () =
-      try
-        ignore (get_vif ()) ;
-        true
-      with _ -> false
+      check_exn (fun () ->
+          let (_ : [> `VIF] Ref.t) = get_vif () in
+          true
+      )
     in
     if config.full_restore && vif_exists () then
       (* If there's already a VIF with the same UUID and we're preserving UUIDs, use that one. *)
@@ -1636,10 +1636,10 @@ module VGPU : HandlerTools = struct
       Client.VGPU.get_by_uuid ~rpc ~session_id ~uuid:vgpu_record.API.vGPU_uuid
     in
     let vgpu_exists () =
-      try
-        ignore (get_vgpu ()) ;
-        true
-      with _ -> false
+      check_exn (fun () ->
+          let (_ : [> `VGPU] Ref.t) = get_vgpu () in
+          true
+      )
     in
     if config.full_restore && vgpu_exists () then
       let vgpu = get_vgpu () in

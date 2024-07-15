@@ -17,6 +17,7 @@
     xapi-consts
     xapi-schema
     xapi-stdext-date
+    xapi-stdext-pervasives
     xapi-stdext-std
     xapi-stdext-unix
   )
@@ -70,6 +71,7 @@
   (libraries
     dune-build-info
     xapi-datamodel
+    xapi-stdext-pervasives
     xapi-consts.xapi_version
   )
   (promote (until-clean))

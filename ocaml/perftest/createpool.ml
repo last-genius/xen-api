@@ -19,6 +19,8 @@ open Xapi_stdext_std
 open Scenario
 open Perfdebug
 
+let check_exn = Xapi_stdext_pervasives.Pervasiveext.check_exn
+
 let master_of_pool = "master_of_pool"
 
 let management_ip = "management_ip"
@@ -177,11 +179,11 @@ let uninitialise session_id _template key =
         Client.VM.get_is_control_domain ~rpc ~session_id ~self:vm
       in
       let is_managed =
-        try
-          List.assoc oc_key
-            (Client.VM.get_other_config ~rpc ~session_id ~self:vm)
-          = key
-        with _ -> false
+        check_exn (fun () ->
+            List.assoc oc_key
+              (Client.VM.get_other_config ~rpc ~session_id ~self:vm)
+            = key
+        )
       in
       let running =
         Client.VM.get_power_state ~rpc ~session_id ~self:vm = `Running
@@ -390,29 +392,29 @@ let create_sdk_pool session_id sdkname pool_name key ipbase =
         true
       else
         let rpc = remoterpc ip in
-        try
-          let session_id =
-            Client.Session.login_with_password ~rpc ~uname:"root"
-              ~pwd:"xensource" ~version:"1.1" ~originator:"perftest"
-          in
-          Xapi_stdext_pervasives.Pervasiveext.finally
-            (fun () ->
-              let host = List.hd (Client.Host.get_all ~rpc ~session_id) in
-              (* only one host because it hasn't joined the pool yet *)
-              let other_config =
-                Client.Host.get_other_config ~rpc ~session_id ~self:host
-              in
-              let key = "firstboot-complete" in
-              (* Since these are 'fresh' hosts which have never booted, the key goes from missing -> present *)
-              if List.mem_assoc key other_config then (
-                firstboot.(i) <- true ;
-                debug "Individual host status: %s" (string_of_status ()) ;
-                true
-              ) else
-                false
-            )
-            (fun () -> Client.Session.logout ~rpc ~session_id)
-        with _ -> false
+        check_exn (fun () ->
+            let session_id =
+              Client.Session.login_with_password ~rpc ~uname:"root"
+                ~pwd:"xensource" ~version:"1.1" ~originator:"perftest"
+            in
+            Xapi_stdext_pervasives.Pervasiveext.finally
+              (fun () ->
+                let host = List.hd (Client.Host.get_all ~rpc ~session_id) in
+                (* only one host because it hasn't joined the pool yet *)
+                let other_config =
+                  Client.Host.get_other_config ~rpc ~session_id ~self:host
+                in
+                let key = "firstboot-complete" in
+                (* Since these are 'fresh' hosts which have never booted, the key goes from missing -> present *)
+                if List.mem_assoc key other_config then (
+                  firstboot.(i) <- true ;
+                  debug "Individual host status: %s" (string_of_status ()) ;
+                  true
+                ) else
+                  false
+              )
+              (fun () -> Client.Session.logout ~rpc ~session_id)
+        )
     in
     is_pingable () && firstbooted ()
   in
@@ -489,21 +491,21 @@ let create_sdk_pool session_id sdkname pool_name key ipbase =
       )
   in
   let has_host_booted rpc session_id i host =
-    try
-      if live.(i) && enabled.(i) then
-        true
-      else
-        let metrics = Client.Host.get_metrics ~rpc ~session_id ~self:host in
-        let live' =
-          Client.Host_metrics.get_live ~rpc ~session_id ~self:metrics
-        in
-        let enabled' = Client.Host.get_enabled ~rpc ~session_id ~self:host in
-        if live.(i) <> live' || enabled.(i) <> enabled' then
-          debug "Individual host status: %s" (string_of_status ()) ;
-        live.(i) <- live' ;
-        enabled.(i) <- enabled' ;
-        live' && enabled'
-    with _ -> false
+    check_exn (fun () ->
+        if live.(i) && enabled.(i) then
+          true
+        else
+          let metrics = Client.Host.get_metrics ~rpc ~session_id ~self:host in
+          let live' =
+            Client.Host_metrics.get_live ~rpc ~session_id ~self:metrics
+          in
+          let enabled' = Client.Host.get_enabled ~rpc ~session_id ~self:host in
+          if live.(i) <> live' || enabled.(i) <> enabled' then
+            debug "Individual host status: %s" (string_of_status ()) ;
+          live.(i) <- live' ;
+          enabled.(i) <- enabled' ;
+          live' && enabled'
+    )
   in
   let finished = ref false in
   while not !finished do

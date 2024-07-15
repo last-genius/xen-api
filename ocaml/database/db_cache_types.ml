@@ -14,6 +14,8 @@
 
 open Db_exn
 
+let check_exn = Xapi_stdext_pervasives.Pervasiveext.check_exn
+
 module Time = struct type t = Generation.t end
 
 module HashedString = struct
@@ -529,10 +531,10 @@ let update_one_to_many g tblname objref f db =
           Schema.Value.Unsafe_cast.string (get_field tblname objref one_fld db)
         in
         let valid =
-          try
-            ignore (Database.table_of_ref one_fld_val db) ;
-            true
-          with _ -> false
+          check_exn (fun () ->
+              let (_ : string) = Database.table_of_ref one_fld_val db in
+              true
+          )
         in
         if valid then
           unsafe_set_field g many_tbl one_fld_val many_fld
@@ -557,10 +559,10 @@ let update_many_to_many g tblname objref f db =
         List.fold_left
           (fun db other_ref ->
             let valid =
-              try
-                ignore (Database.table_of_ref other_ref db) ;
-                true
-              with _ -> false
+              check_exn (fun () ->
+                  let (_ : string) = Database.table_of_ref other_ref db in
+                  true
+              )
             in
             if valid then
               let other_field = get_field other_tbl other_ref other_fld db in

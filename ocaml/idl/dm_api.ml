@@ -13,6 +13,8 @@
  *)
 open Datamodel_types
 
+let check_exn = Xapi_stdext_pervasives.Pervasiveext.check_exn
+
 (** The api is made up of objects (which contain fields and additional RPCs), and
     relationships, which specify which fields are bound together -- i.e. refer to the
     same underlying data *)
@@ -40,10 +42,10 @@ let get_obj_by_name (system, _) ~objname:name =
       failwith (Printf.sprintf "Object with name [%s] not found in system" name)
 
 let obj_exists api name =
-  try
-    let (_ : obj) = get_obj_by_name api ~objname:name in
-    true
-  with _ -> false
+  check_exn (fun () ->
+      let (_ : obj) = get_obj_by_name api ~objname:name in
+      true
+  )
 
 (** Retrieves the field of an obj given its name *)
 let get_field_by_name api ~objname ~fieldname:name =
@@ -67,10 +69,10 @@ let get_field_by_name api ~objname ~fieldname:name =
         (Printf.sprintf "field not found (field %s in object %s)" name obj.name)
 
 let field_exists api ~objname ~fieldname =
-  try
-    let (_ : field) = get_field_by_name api ~objname ~fieldname in
-    true
-  with _ -> false
+  check_exn (fun () ->
+      let (_ : field) = get_field_by_name api ~objname ~fieldname in
+      true
+  )
 
 (** Takes a predicate and a list of objects, returning the objects with all the fields
     removed for which the field applied to the predicate returned false.

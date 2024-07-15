@@ -4,6 +4,7 @@
   (libraries
     cohttp
     unix
+    xapi-stdext-pervasives
   )
   (wrapped false)
 )

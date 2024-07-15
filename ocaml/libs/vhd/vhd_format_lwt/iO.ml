@@ -12,6 +12,8 @@
  * GNU Lesser General Public License for more details.
  *)
 
+let check_exn = Xapi_stdext_pervasives.Pervasiveext.check_exn
+
 let debug_io = ref false
 
 let complete name offset op fd buffer =
@@ -162,10 +164,10 @@ module IO = struct
 
   let exists path =
     return
-      ( try
-          ignore (Unix.LargeFile.stat path) ;
-          true
-        with _ -> false
+      (check_exn (fun () ->
+           let (_ : Unix.LargeFile.stats) = Unix.LargeFile.stat path in
+           true
+       )
       )
 
   let y2k = 946684800.0 (* seconds from the unix epoch to the vhd epoch *)

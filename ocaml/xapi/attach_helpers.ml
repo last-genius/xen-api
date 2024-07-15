@@ -64,11 +64,11 @@ let has_vbd_leaked __context vbd =
         Ref.of_string (List.assoc Xapi_globs.vbd_task_key other_config)
       in
       (* check if the task record still exists and is pending *)
-      try
-        let status = Db.Task.get_status ~__context ~self:task_id in
-        List.mem status [`pending; `cancelling]
-        (* pending and cancelling => not leaked *)
-      with _ -> false
+      check_exn (fun () ->
+          let status = Db.Task.get_status ~__context ~self:task_id in
+          List.mem status [`pending; `cancelling]
+          (* pending and cancelling => not leaked *)
+      )
       (* task record gone *)
     in
     let has_valid_related =
@@ -78,8 +78,9 @@ let has_vbd_leaked __context vbd =
         Ref.of_string (List.assoc Xapi_globs.related_to_key other_config)
       in
       (* check if the VBD still exists and is currently_attached *)
-      try Db.VBD.get_currently_attached ~__context ~self:related
-      with _ -> false
+      check_exn (fun () ->
+          Db.VBD.get_currently_attached ~__context ~self:related
+      )
       (* VBD record gone *)
     in
     (* leaked if neither of the two keys are still valid *)

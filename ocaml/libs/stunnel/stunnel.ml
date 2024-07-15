@@ -55,7 +55,7 @@ let init_stunnel_path () =
             match
               List.find_opt
                 (fun el ->
-                  try Unix.access el [Unix.X_OK] ; true with _ -> false
+                  check_exn (fun () -> Unix.access el [Unix.X_OK] ; true)
                 )
                 l
             with
@@ -178,8 +178,9 @@ let config_file ?(accept = None) config host port =
   ) ;
   let is_fips =
     Inventory.inventory_filename := "/etc/xensource-inventory" ;
-    try bool_of_string (Inventory.lookup ~default:"false" "CC_PREPARATIONS")
-    with _ -> false
+    check_exn (fun () ->
+        bool_of_string (Inventory.lookup ~default:"false" "CC_PREPARATIONS")
+    )
   in
   String.concat "\n"
   @@ List.concat

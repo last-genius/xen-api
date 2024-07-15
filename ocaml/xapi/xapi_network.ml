@@ -16,6 +16,8 @@ let with_lock = Xapi_stdext_threads.Threadext.Mutex.execute
 open Client
 open Xapi_stdext_std.Xstringext
 
+let check_exn = Xapi_stdext_pervasives.Pervasiveext.check_exn
+
 module D = Debug.Make (struct let name = "xapi_network" end)
 
 open D
@@ -54,7 +56,7 @@ let set_himn_ip ~__context bridge other_config =
     let ip = List.assoc "ip_begin" other_config in
     let netmask = List.assoc "netmask" other_config in
     let persist =
-      try List.assoc "persist" other_config |> bool_of_string with _ -> false
+      check_exn (fun () -> List.assoc "persist" other_config |> bool_of_string)
     in
     let ipv4_conf =
       Network_interface.(
@@ -94,7 +96,7 @@ let attach_internal ?(management_interface = false) ?(force_bringup = false)
     Xapi_network_attach_helpers.get_local_pifs ~__context ~network:self ~host
   in
   let persist =
-    try List.mem_assoc "persist" net.API.network_other_config with _ -> false
+    check_exn (fun () -> List.mem_assoc "persist" net.API.network_other_config)
   in
   (* Check whether the network is managed or not. If not, the only thing that it must do is check whether the bridge exists.*)
   if not net.API.network_managed then (
@@ -299,11 +301,10 @@ let destroy ~__context ~self =
   let oc = Db.Network.get_other_config ~__context ~self in
   if
     List.mem_assoc Xapi_globs.is_host_internal_management_network oc
-    &&
-    try
-      bool_of_string
-        (List.assoc Xapi_globs.is_host_internal_management_network oc)
-    with _ -> false
+    && check_exn (fun () ->
+           bool_of_string
+             (List.assoc Xapi_globs.is_host_internal_management_network oc)
+       )
   then
     raise
       (Api_errors.Server_error

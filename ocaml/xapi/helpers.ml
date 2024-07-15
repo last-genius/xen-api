@@ -20,6 +20,8 @@ module Unixext = Xapi_stdext_unix.Unixext
 
 let finally = Xapi_stdext_pervasives.Pervasiveext.finally
 
+let check_exn = Xapi_stdext_pervasives.Pervasiveext.check_exn
+
 let with_lock = Xapi_stdext_threads.Threadext.Mutex.execute
 
 open Xapi_globs
@@ -639,8 +641,7 @@ let update_domain_zero_name ~__context host hostname =
   else
     let current_name = Db.VM.get_name_label ~__context ~self:dom0 in
     let is_default =
-      try String.sub current_name 0 (String.length stem) = stem
-      with _ -> false
+      check_exn (fun () -> String.sub current_name 0 (String.length stem) = stem)
     in
     if is_default && current_name <> full_name then
       Db.VM.set_name_label ~__context ~self:dom0 ~value:full_name
@@ -682,11 +683,11 @@ let rolling_upgrade_in_progress_of_oc oc =
    is not present in the database; that only happens on firstboot (when you're a master with no db and you're creating
    the db for the first time). In that context you cannot be in rolling upgrade mode *)
 let rolling_upgrade_in_progress ~__context =
-  try
-    let pool = get_pool ~__context in
-    rolling_upgrade_in_progress_of_oc
-      (Db.Pool.get_other_config ~__context ~self:pool)
-  with _ -> false
+  check_exn (fun () ->
+      let pool = get_pool ~__context in
+      rolling_upgrade_in_progress_of_oc
+        (Db.Pool.get_other_config ~__context ~self:pool)
+  )
 
 let check_domain_type : API.domain_type -> [`hvm | `pv_in_pvh | `pv | `pvh] =
   function
@@ -792,8 +793,9 @@ let get_special_network other_config_key ~__context =
   let nets = Db.Network.get_all ~__context in
   let findfn net =
     let other_config = Db.Network.get_other_config ~__context ~self:net in
-    try bool_of_string (List.assoc other_config_key other_config)
-    with _ -> false
+    check_exn (fun () ->
+        bool_of_string (List.assoc other_config_key other_config)
+    )
   in
   (* Assume there's only one of these! *)
   List.find findfn nets
@@ -985,16 +987,16 @@ let pool_has_different_host_platform_versions ~__context =
 (* Checks that a host has a PBD for a particular SR (meaning that the
    SR is visible to the host) *)
 let host_has_pbd_for_sr ~__context ~host ~sr =
-  try
-    let sr_pbds = Db.SR.get_PBDs ~__context ~self:sr in
-    let sr_host_pbd =
-      List.filter
-        (fun pbd -> host = Db.PBD.get_host ~__context ~self:pbd)
-        sr_pbds
-    in
-    sr_host_pbd <> []
-    (* empty list means no PBDs *)
-  with _ -> false
+  check_exn (fun () ->
+      let sr_pbds = Db.SR.get_PBDs ~__context ~self:sr in
+      let sr_host_pbd =
+        List.filter
+          (fun pbd -> host = Db.PBD.get_host ~__context ~self:pbd)
+          sr_pbds
+      in
+      sr_host_pbd <> []
+      (* empty list means no PBDs *)
+  )
 
 (* Checks if an SR exists, returning an SR ref option (None if it is missing) *)
 let check_sr_exists ~__context ~self =
@@ -1201,7 +1203,7 @@ let get_live_hosts ~__context =
   List.filter
     (fun self ->
       let metrics = Db.Host.get_metrics ~__context ~self in
-      try Db.Host_metrics.get_live ~__context ~self:metrics with _ -> false
+      check_exn (fun () -> Db.Host_metrics.get_live ~__context ~self:metrics)
     )
     hosts
 
@@ -1245,22 +1247,23 @@ let gethostbyname host =
 
 (** Indicate whether VM.clone should be allowed on suspended VMs *)
 let clone_suspended_vm_enabled ~__context =
-  try
-    let pool = get_pool ~__context in
-    let other_config = Db.Pool.get_other_config ~__context ~self:pool in
-    List.mem_assoc Xapi_globs.pool_allow_clone_suspended_vm other_config
-    && List.assoc Xapi_globs.pool_allow_clone_suspended_vm other_config = "true"
-  with _ -> false
+  check_exn (fun () ->
+      let pool = get_pool ~__context in
+      let other_config = Db.Pool.get_other_config ~__context ~self:pool in
+      List.mem_assoc Xapi_globs.pool_allow_clone_suspended_vm other_config
+      && List.assoc Xapi_globs.pool_allow_clone_suspended_vm other_config
+         = "true"
+  )
 
 (** Indicate whether run-script should be allowed on VM plugin guest-agent-operation *)
 let guest_agent_run_script_enabled ~__context =
-  try
-    let pool = get_pool ~__context in
-    let other_config = Db.Pool.get_other_config ~__context ~self:pool in
-    List.mem_assoc Xapi_globs.pool_allow_guest_agent_run_script other_config
-    && List.assoc Xapi_globs.pool_allow_guest_agent_run_script other_config
-       = "true"
-  with _ -> false
+  check_exn (fun () ->
+      let pool = get_pool ~__context in
+      let other_config = Db.Pool.get_other_config ~__context ~self:pool in
+      List.mem_assoc Xapi_globs.pool_allow_guest_agent_run_script other_config
+      && List.assoc Xapi_globs.pool_allow_guest_agent_run_script other_config
+         = "true"
+  )
 
 (* OEM Related helper functions *)
 let is_oem ~__context ~host =
@@ -1302,10 +1305,10 @@ let is_xha_protected_r record =
     record.API.vM_ha_restart_priority
 
 let local_storage_exists () =
-  try
-    ignore (Unix.stat Xapi_globs.xapi_blob_location) ;
-    true
-  with _ -> false
+  check_exn (fun () ->
+      ignore (Unix.stat Xapi_globs.xapi_blob_location) ;
+      true
+  )
 
 (** Stdlib's Arg module doesn't support string option ref, instead the empty
     string is used for expressing the null value *)
@@ -1968,11 +1971,11 @@ end = struct
         make_urandom ()
     in
     let use_script =
-      try
-        Unix.access !Xapi_globs.gen_pool_secret_script [Unix.X_OK] ;
-        Xapi_inventory.lookup ~default:"false" "CC_PREPARATIONS"
-        |> bool_of_string
-      with _ -> false
+      check_exn (fun () ->
+          Unix.access !Xapi_globs.gen_pool_secret_script [Unix.X_OK] ;
+          Xapi_inventory.lookup ~default:"false" "CC_PREPARATIONS"
+          |> bool_of_string
+      )
     in
     if use_script then
       make_script ()

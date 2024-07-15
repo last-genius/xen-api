@@ -14,6 +14,8 @@
 
 open Datamodel_types
 
+let check_exn = Xapi_stdext_pervasives.Pervasiveext.check_exn
+
 let current_version =
   Scanf.sscanf Xapi_version.version "%d.%d.%d%[.-]%s"
     (fun mj mn mc _sep _rest -> Printf.sprintf "%d.%d.%d" mj mn mc
@@ -21,12 +23,13 @@ let current_version =
 
 (* A version tag starts with a number *)
 let is_version name =
-  try Scanf.sscanf name "%d" (fun _ -> true) with _ -> false
+  check_exn (fun () -> Scanf.sscanf name "%d" (fun _ -> true))
 
 (* A tag that starts with an older version than the current and ends with "-next" *)
 let replace_version version =
-  try Scanf.sscanf version "%s@-next" (fun v -> v <> current_version)
-  with _ -> false
+  check_exn (fun () ->
+      Scanf.sscanf version "%s@-next" (fun v -> v <> current_version)
+  )
 
 let update_prototyped {Lifecycle.state; transitions} =
   match (state, Datamodel_common.get_prototyped transitions) with
