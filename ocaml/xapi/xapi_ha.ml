@@ -752,9 +752,7 @@ module Monitor = struct
                         uuids
                     in
                     let enabled, disabled =
-                      List.partition
-                        (fun (_, x) -> x)
-                        (List.combine uuids enabled)
+                      List.partition snd (List.combine uuids enabled)
                     in
                     debug "Enabled hosts = [ %s ]; disabled hosts = [ %s ]"
                       (String.concat "; " (List.map fst enabled))

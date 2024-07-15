@@ -3442,7 +3442,7 @@ let check_update_readiness ~__context ~self:_ ~requires_reboot =
     else if requires_reboot then
       Xapi_host.get_vms_which_prevent_evacuation_internal ~__context ~self:host
         ~ignore_ha:true
-      |> List.map (fun (_, error) -> error)
+      |> List.map snd
     else
       [[]]
   in
