@@ -54,7 +54,7 @@ let schema_check keys checker members =
     let sorted_lst2 = List.sort String.compare lst2 in
     List.compare String.compare sorted_lst1 sorted_lst2 = 0
   in
-  let keys' = List.map (fun (k, _) -> k) members in
+  let keys' = List.map fst members in
   compare_keys keys keys' && List.for_all checker members
 
 let verify_field_member = function

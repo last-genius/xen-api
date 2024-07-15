@@ -141,7 +141,7 @@ let require_operation_on_pci_device ~__context ~sriov ~self =
                Db.PCI.get_driver_name ~__context ~self:pci = driver_name
            )
         |> List.filter (fun (_, pif_rec) -> is_sriov_enabled ~pif_rec)
-        |> List.map (fun (pif_ref, _) -> pif_ref)
+        |> List.map fst
         |> ( = ) [self]
   else
     false

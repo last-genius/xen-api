@@ -34,9 +34,7 @@ let run_assert_equal_with_vdi ~__context msg ?(expensive_sharing_checks = true)
       Xapi_vbd_helpers.valid_operations ~__context ~expensive_sharing_checks
         vbd_record vbd_ref
     in
-    Option.map
-      (fun (code, _) -> code)
-      (Option.join (Hashtbl.find_opt valid_ops op))
+    Option.map fst (Option.join (Hashtbl.find_opt valid_ops op))
   in
   Alcotest.(check (option string))
     msg expected_error_if_any (get_error_code_of op)

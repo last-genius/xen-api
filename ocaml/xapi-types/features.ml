@@ -152,7 +152,7 @@ let tag_of_feature f =
   let _, _, tag = List.assoc f keys_of_features in
   tag
 
-let all_features = List.map (fun (f, _) -> f) keys_of_features
+let all_features = List.map fst keys_of_features
 
 let to_compact_string (s : feature list) =
   let get_tag f =

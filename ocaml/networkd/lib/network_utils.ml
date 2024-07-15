@@ -1409,7 +1409,7 @@ module Ovs = struct
         let vlans_on_bridge =
           List.filter (fun (_, br) -> List.mem br bridge_ports) vlans_with_uuid
         in
-        List.map (fun (n, _) -> n) vlans_on_bridge
+        List.map fst vlans_on_bridge
       with _ -> []
 
     let get_bridge_vlan_vifs ~name =

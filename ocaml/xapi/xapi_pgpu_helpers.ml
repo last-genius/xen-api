@@ -143,7 +143,7 @@ let get_remaining_capacity_internal ~__context ~self ~vgpu_type
       let pgpu_size = Db.PGPU.get_size ~__context ~self in
       let pgpu_pre_allocated_vGPUs =
         List.filter (fun (_, pgpu) -> pgpu = self) pre_allocate_list
-        |> List.map (fun (vgpu, _) -> vgpu)
+        |> List.map fst
       in
       let utilisation =
         List.fold_left

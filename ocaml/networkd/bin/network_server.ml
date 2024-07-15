@@ -703,7 +703,7 @@ module Interface = struct
             config
         in
         debug "** Configuring the following interfaces: %s%s"
-          (String.concat ", " (List.map (fun (name, _) -> name) config))
+          (String.concat ", " (List.map fst config))
           (if conservative then " (best effort)" else "") ;
         let exec f = if conservative then try f () with _ -> () else f () in
         List.iter
@@ -1413,9 +1413,7 @@ module Bridge = struct
               List.filter (fun (_name, bridge) -> bridge.persistent_b) config
             in
             debug "Ensuring the following persistent bridges are up: %s"
-              (String.concat ", "
-                 (List.map (fun (name, _) -> name) persistent_config)
-              ) ;
+              (String.concat ", " (List.map fst persistent_config)) ;
             let vlan_parents =
               List.filter_map
                 (function
@@ -1432,9 +1430,7 @@ module Bridge = struct
             debug
               "Additionally ensuring the following VLAN parent bridges are up: \
                %s"
-              (String.concat ", "
-                 (List.map (fun (name, _) -> name) vlan_parents)
-              ) ;
+              (String.concat ", " (List.map fst vlan_parents)) ;
             let config = vlan_parents @ persistent_config in
             (* Do not try to recreate bridges that already exist *)
             let current = get_all dbg () in
@@ -1447,7 +1443,7 @@ module Bridge = struct
         let config = List.sort vlans_go_last config in
         let exec f = if conservative then try f () with _ -> () else f () in
         debug "** Configuring the following bridges: %s%s"
-          (String.concat ", " (List.map (fun (name, _) -> name) config))
+          (String.concat ", " (List.map fst config))
           (if conservative then " (best effort)" else "") ;
         List.iter
           (function

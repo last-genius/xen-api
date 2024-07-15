@@ -101,7 +101,7 @@ let allocate_vgpu_to_gpu ?(dry_run = false) ?(pre_allocate_list = []) ~__context
   (* Sort the pGPU list by the capacity for the target vGPU *)
   Helpers.sort_by_schwarzian ~descending:sort_desc
     (fun pgpu -> List.assoc pgpu pgpu_capacity_assoc)
-    (List.map (fun (pgpu, _) -> pgpu) pgpu_capacity_assoc)
+    (List.map fst pgpu_capacity_assoc)
   |> function
   | [] ->
       fail_creation vm vgpu

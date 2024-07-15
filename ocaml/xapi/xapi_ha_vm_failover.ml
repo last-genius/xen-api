@@ -709,7 +709,7 @@ let get_live_set ~__context =
       )
       all_hosts
   in
-  List.map (fun (rf, _) -> rf) live_hosts
+  List.map fst live_hosts
 
 (** Given the current number of host failures to consider (only useful for passing to the binpacker to influence its
     choice of heuristic), return an instantaneous VM restart plan which includes all protected offline VMs, and a

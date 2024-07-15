@@ -177,9 +177,7 @@ let evaluate_sort_partition evaluate sort partition list =
   let list_selected, list_unselected =
     List.partition (fun (_, av) -> partition av) list_sorted
   in
-  ( List.map (fun (a, _) -> a) list_selected
-  , List.map (fun (a, _) -> a) list_unselected
-  )
+  (List.map fst list_selected, List.map fst list_unselected)
 
 (* === Host categories======================================================= *)
 

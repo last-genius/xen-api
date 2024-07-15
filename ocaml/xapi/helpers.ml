@@ -879,7 +879,7 @@ let sort_by_schwarzian ?(descending = false) f list =
   let comp x y = if descending then compare y x else compare x y in
   List.map (fun x -> (x, f x)) list
   |> List.sort (fun (_, x') (_, y') -> comp x' y')
-  |> List.map (fun (x, _) -> x)
+  |> List.map fst
 
 let platform_version_inverness = [2; 4; 0]
 

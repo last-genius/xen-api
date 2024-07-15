@@ -28,7 +28,7 @@ open D
 	- Additional: Relating to features provided by v6d beyond the core ones.
 *)
 
-let all_flags = List.map (fun (k, _) -> k) (to_assoc_list all_features)
+let all_flags = List.map fst (to_assoc_list all_features)
 
 (* The set of core restrictions of a pool is the intersection of the sets of features
     of the individual hosts. *)

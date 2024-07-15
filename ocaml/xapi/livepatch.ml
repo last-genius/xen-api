@@ -116,7 +116,7 @@ module KernelLivePatch = struct
                (line :: acc, false)
          )
          ([], false)
-    |> (fun (x, _) -> x)
+    |> fst
     |> List.filter_map (fun line ->
            let replace s =
              Astring.String.cuts ~sep:"_" s |> Astring.String.concat ~sep:"."
