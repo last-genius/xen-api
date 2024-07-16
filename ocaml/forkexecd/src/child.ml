@@ -170,19 +170,23 @@ let run state comms_sock fd_sock fd_sock_path =
     let args =
       List.map
         (fun arg ->
-          try
-            let id_received, fd =
-              List.find
-                (fun (id_received, _fd) ->
-                  Astring.String.is_suffix ~affix:id_received arg
-                )
-                state.ids_received
-            in
-            let stem =
-              String.sub arg 0 (String.length arg - String.length id_received)
-            in
-            stem ^ string_of_int (Fd_send_recv.int_of_fd fd)
-          with _ -> arg
+          match
+            List.find_opt
+              (fun (id_received, _fd) ->
+                Astring.String.is_suffix ~affix:id_received arg
+              )
+              state.ids_received
+          with
+          | Some (id_received, fd) -> (
+            try
+              let stem =
+                String.sub arg 0 (String.length arg - String.length id_received)
+              in
+              stem ^ string_of_int (Fd_send_recv.int_of_fd fd)
+            with _ -> arg
+          )
+          | None ->
+              arg
         )
         state.cmdargs
     in

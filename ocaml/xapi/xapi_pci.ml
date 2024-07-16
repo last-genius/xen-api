@@ -100,17 +100,17 @@ let update_pf_vf_relations ~__context pfs vfs =
   let set_phyfn (vf_ref, vf_rec, _, phyfn_path) pfs =
     match phyfn_path with
     | Some phyfn_path -> (
-      try
-        let pf, _, _, _ =
-          List.find
-            (fun (_, pf_rec, _, _) -> phyfn_path = pf_rec.Db_actions.pCI_pci_id)
-            pfs
-        in
-        if vf_rec.Db_actions.pCI_physical_function <> pf then
-          Db.PCI.set_physical_function ~__context ~self:vf_ref ~value:pf
-      with Not_found ->
-        error "Failed to find physical function of vf %s"
-          vf_rec.Db_actions.pCI_uuid
+      match
+        List.find_opt
+          (fun (_, pf_rec, _, _) -> phyfn_path = pf_rec.Db_actions.pCI_pci_id)
+          pfs
+      with
+      | Some (pf, _, _, _) ->
+          if vf_rec.Db_actions.pCI_physical_function <> pf then
+            Db.PCI.set_physical_function ~__context ~self:vf_ref ~value:pf
+      | None ->
+          error "Failed to find physical function of vf %s"
+            vf_rec.Db_actions.pCI_uuid
     )
     | None ->
         ()
@@ -152,81 +152,85 @@ let update_pcis ~__context =
         cur
     | pci :: remaining_pcis ->
         let obj =
-          try
-            let subsystem_vendor_id, subsystem_vendor_name =
-              strings_of_pci_property pci.subsystem_vendor
-            in
-            let subsystem_device_id, subsystem_device_name =
-              strings_of_pci_property pci.subsystem_device
-            in
-            let driver_name = string_of_pci_driver_name pci.driver_name in
-            let rf, rc =
-              List.find
-                (fun (_, rc) ->
-                  rc.Db_actions.pCI_pci_id = pci.address
-                  && rc.Db_actions.pCI_vendor_id = id_of_int pci.vendor.id
-                  && rc.Db_actions.pCI_device_id = id_of_int pci.device.id
-                  && rc.Db_actions.pCI_subsystem_vendor_id = subsystem_vendor_id
-                  && rc.Db_actions.pCI_subsystem_device_id = subsystem_device_id
-                )
-                existing
-            in
-            (* sync the vendor name. *)
-            if rc.Db_actions.pCI_vendor_name <> pci.vendor.name then
-              Db.PCI.set_vendor_name ~__context ~self:rf ~value:pci.vendor.name ;
-            (* sync the device name. *)
-            if rc.Db_actions.pCI_device_name <> pci.device.name then
-              Db.PCI.set_device_name ~__context ~self:rf ~value:pci.device.name ;
-            (* sync the subsystem vendor name. *)
-            if rc.Db_actions.pCI_subsystem_vendor_name <> subsystem_vendor_name
-            then
-              Db.PCI.set_subsystem_vendor_name ~__context ~self:rf
-                ~value:subsystem_vendor_name ;
-            (* sync the subsystem device name. *)
-            if rc.Db_actions.pCI_subsystem_device_name <> subsystem_device_name
-            then
-              Db.PCI.set_subsystem_device_name ~__context ~self:rf
-                ~value:subsystem_device_name ;
-            (* sync the driver name. *)
-            if rc.Db_actions.pCI_driver_name <> driver_name then
-              Db.PCI.set_driver_name ~__context ~self:rf ~value:driver_name ;
-            (* sync the class information. *)
-            if rc.Db_actions.pCI_class_id <> id_of_int pci.pci_class.id then
-              Db.PCI.set_class_id ~__context ~self:rf
-                ~value:(id_of_int pci.pci_class.id) ;
-            if rc.Db_actions.pCI_class_name <> pci.pci_class.name then
-              Db.PCI.set_class_name ~__context ~self:rf
-                ~value:pci.pci_class.name ;
-            (* sync the attached VMs. *)
-            let attached_VMs =
-              List.filter
-                (Db.is_valid_ref __context)
-                rc.Db_actions.pCI_attached_VMs
-            in
-            if attached_VMs <> rc.Db_actions.pCI_attached_VMs then
-              Db.PCI.set_attached_VMs ~__context ~self:rf ~value:attached_VMs ;
-            (rf, rc)
-          with Not_found ->
-            let subsystem_vendor_id, subsystem_vendor_name =
-              strings_of_pci_property pci.subsystem_vendor
-            in
-            let subsystem_device_id, subsystem_device_name =
-              strings_of_pci_property pci.subsystem_device
-            in
-            let driver_name = string_of_pci_driver_name pci.driver_name in
-            let self =
-              create ~__context
-                ~class_id:(id_of_int pci.pci_class.id)
-                ~class_name:pci.pci_class.name
-                ~vendor_id:(id_of_int pci.vendor.id)
-                ~vendor_name:pci.vendor.name
-                ~device_id:(id_of_int pci.device.id)
-                ~device_name:pci.device.name ~host ~pci_id:pci.address
-                ~functions:1L ~physical_function:Ref.null ~dependencies:[]
-                ~other_config:[] ~subsystem_vendor_id ~subsystem_vendor_name
-                ~subsystem_device_id ~subsystem_device_name ~driver_name
-            in
-            (self, Db.PCI.get_record_internal ~__context ~self)
+          let subsystem_vendor_id, subsystem_vendor_name =
+            strings_of_pci_property pci.subsystem_vendor
+          in
+          let subsystem_device_id, subsystem_device_name =
+            strings_of_pci_property pci.subsystem_device
+          in
+          let driver_name = string_of_pci_driver_name pci.driver_name in
+          match
+            List.find_opt
+              (fun (_, rc) ->
+                rc.Db_actions.pCI_pci_id = pci.address
+                && rc.Db_actions.pCI_vendor_id = id_of_int pci.vendor.id
+                && rc.Db_actions.pCI_device_id = id_of_int pci.device.id
+                && rc.Db_actions.pCI_subsystem_vendor_id = subsystem_vendor_id
+                && rc.Db_actions.pCI_subsystem_device_id = subsystem_device_id
+              )
+              existing
+          with
+          | Some (rf, rc) ->
+              (* sync the vendor name. *)
+              if rc.Db_actions.pCI_vendor_name <> pci.vendor.name then
+                Db.PCI.set_vendor_name ~__context ~self:rf
+                  ~value:pci.vendor.name ;
+              (* sync the device name. *)
+              if rc.Db_actions.pCI_device_name <> pci.device.name then
+                Db.PCI.set_device_name ~__context ~self:rf
+                  ~value:pci.device.name ;
+              (* sync the subsystem vendor name. *)
+              if
+                rc.Db_actions.pCI_subsystem_vendor_name <> subsystem_vendor_name
+              then
+                Db.PCI.set_subsystem_vendor_name ~__context ~self:rf
+                  ~value:subsystem_vendor_name ;
+              (* sync the subsystem device name. *)
+              if
+                rc.Db_actions.pCI_subsystem_device_name <> subsystem_device_name
+              then
+                Db.PCI.set_subsystem_device_name ~__context ~self:rf
+                  ~value:subsystem_device_name ;
+              (* sync the driver name. *)
+              if rc.Db_actions.pCI_driver_name <> driver_name then
+                Db.PCI.set_driver_name ~__context ~self:rf ~value:driver_name ;
+              (* sync the class information. *)
+              if rc.Db_actions.pCI_class_id <> id_of_int pci.pci_class.id then
+                Db.PCI.set_class_id ~__context ~self:rf
+                  ~value:(id_of_int pci.pci_class.id) ;
+              if rc.Db_actions.pCI_class_name <> pci.pci_class.name then
+                Db.PCI.set_class_name ~__context ~self:rf
+                  ~value:pci.pci_class.name ;
+              (* sync the attached VMs. *)
+              let attached_VMs =
+                List.filter
+                  (Db.is_valid_ref __context)
+                  rc.Db_actions.pCI_attached_VMs
+              in
+              if attached_VMs <> rc.Db_actions.pCI_attached_VMs then
+                Db.PCI.set_attached_VMs ~__context ~self:rf ~value:attached_VMs ;
+              (rf, rc)
+          | None ->
+              let subsystem_vendor_id, subsystem_vendor_name =
+                strings_of_pci_property pci.subsystem_vendor
+              in
+              let subsystem_device_id, subsystem_device_name =
+                strings_of_pci_property pci.subsystem_device
+              in
+              let driver_name = string_of_pci_driver_name pci.driver_name in
+              let self =
+                create ~__context
+                  ~class_id:(id_of_int pci.pci_class.id)
+                  ~class_name:pci.pci_class.name
+                  ~vendor_id:(id_of_int pci.vendor.id)
+                  ~vendor_name:pci.vendor.name
+                  ~device_id:(id_of_int pci.device.id)
+                  ~device_name:pci.device.name ~host ~pci_id:pci.address
+                  ~functions:1L ~physical_function:Ref.null ~dependencies:[]
+                  ~other_config:[] ~subsystem_vendor_id ~subsystem_vendor_name
+                  ~subsystem_device_id ~subsystem_device_name ~driver_name
+              in
+              (self, Db.PCI.get_record_internal ~__context ~self)
         in
         update_or_create ((obj, pci) :: cur) remaining_pcis
   in
@@ -261,24 +265,23 @@ let update_pcis ~__context =
           ()
       | (pref, _prec, pci, _) :: remaining ->
           let dependencies =
-            try
-              pci.related
-              |> List.map (fun address ->
-                     let r, _, _, _ =
-                       List.find
-                         (fun (_, rc, _, _) ->
-                           rc.Db_actions.pCI_pci_id = address
-                         )
-                         pfs
-                     in
-                     r
-                 )
-            with Not_found ->
-              let msg =
-                Printf.sprintf "failed to update PCI dependencies for %s (%s)"
-                  (Ref.string_of pref) __LOC__
-              in
-              raise Api_errors.(Server_error (internal_error, [msg]))
+            pci.related
+            |> List.map (fun address ->
+                   match
+                     List.find_opt
+                       (fun (_, rc, _, _) -> rc.Db_actions.pCI_pci_id = address)
+                       pfs
+                   with
+                   | Some (r, _, _, _) ->
+                       r
+                   | None ->
+                       let msg =
+                         Printf.sprintf
+                           "failed to update PCI dependencies for %s (%s)"
+                           (Ref.string_of pref) __LOC__
+                       in
+                       raise Api_errors.(Server_error (internal_error, [msg]))
+               )
           in
           Db.PCI.set_dependencies ~__context ~self:pref ~value:dependencies ;
           update remaining

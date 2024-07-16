@@ -550,28 +550,19 @@ let rio_release =
   }
 
 let get_prototyped lifecycle =
-  try
-    let _, prototyped, _ =
-      List.find (fun (t, _, _) -> t = Prototyped) lifecycle
-    in
-    Some prototyped
-  with Not_found -> None
+  Option.map
+    (fun (_, prototyped, _) -> prototyped)
+    (List.find_opt (fun (t, _, _) -> t = Prototyped) lifecycle)
 
 let get_published lifecycle =
-  try
-    let _, published, _ =
-      List.find (fun (t, _, _) -> t = Published) lifecycle
-    in
-    Some published
-  with Not_found -> None
+  Option.map
+    (fun (_, published, _) -> published)
+    (List.find_opt (fun (t, _, _) -> t = Published) lifecycle)
 
 let get_deprecated lifecycle =
-  try
-    let _, deprecated, _ =
-      List.find (fun (t, _, _) -> t = Deprecated) lifecycle
-    in
-    Some deprecated
-  with Not_found -> None
+  Option.map
+    (fun (_, deprecated, _) -> deprecated)
+    (List.find_opt (fun (t, _, _) -> t = Deprecated) lifecycle)
 
 let call ~name ?(doc = "") ?(in_oss_since = Some "3.0.3") ?in_product_since
     ?internal_deprecated_since ?result ?(flags = [`Session; `Async])

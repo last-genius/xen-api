@@ -169,15 +169,17 @@ let rec descend_and_match tag_names xml =
         )
         xml
   | hd_tag :: tail, Xml.Element (_, _, xml_elements) -> (
-    try
+    match
       (* take the tag off the head of the list and search the children of this element for it *)
-      descend_and_match tail
-        (List.find (fun x -> match_xml_tag x hd_tag) xml_elements)
-    with Not_found ->
-      raise
-        (Xml_parse_failure
-           (sprintf "Descend_and_match failed. Node %s not found." hd_tag)
-        )
+      List.find_opt (fun x -> match_xml_tag x hd_tag) xml_elements
+    with
+    | Some x ->
+        descend_and_match tail x
+    | None ->
+        raise
+          (Xml_parse_failure
+             (sprintf "Descend_and_match failed. Node %s not found." hd_tag)
+          )
   )
   | _, Xml.PCData _ ->
       (* This should never happen as a leaf node is detected in an earlier match and returned *)

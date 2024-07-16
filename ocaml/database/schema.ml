@@ -103,9 +103,11 @@ module Table = struct
   [@@deriving sexp]
 
   let find name t =
-    try List.find (fun col -> col.Column.name = name) t.columns
-    with Not_found ->
-      raise (Db_exn.DBCache_NotFound ("missing column", t.name, name))
+    match List.find_opt (fun col -> col.Column.name = name) t.columns with
+    | Some x ->
+        x
+    | None ->
+        raise (Db_exn.DBCache_NotFound ("missing column", t.name, name))
 end
 
 type relationship = OneToMany of string * string * string * string
@@ -115,9 +117,11 @@ module Database = struct
   type t = {tables: Table.t list} [@@deriving sexp]
 
   let find name t =
-    try List.find (fun tbl -> tbl.Table.name = name) t.tables
-    with Not_found ->
-      raise (Db_exn.DBCache_NotFound ("missing table", name, ""))
+    match List.find_opt (fun tbl -> tbl.Table.name = name) t.tables with
+    | Some x ->
+        x
+    | None ->
+        raise (Db_exn.DBCache_NotFound ("missing table", name, ""))
 end
 
 (** indexed by table name, a list of (this field, foreign table, foreign field) *)

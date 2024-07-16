@@ -775,10 +775,12 @@ let find_by_name x =
   let open Vm in
   let all = Client.VM.list dbg () in
   let this_one (y, _) = y.id = x || y.name = x in
-  try List.find this_one all
-  with Not_found ->
-    Printf.fprintf stderr "Failed to find VM: %s\n" x ;
-    exit 1
+  match List.find_opt this_one all with
+  | Some x ->
+      x
+  | None ->
+      Printf.fprintf stderr "Failed to find VM: %s\n" x ;
+      exit 1
 
 let remove _copts x =
   let open Vm in
@@ -1194,10 +1196,12 @@ let find_vbd id =
   let vm, _ = find_by_name vm_id in
   let vbds = Client.VBD.list dbg vm.Vm.id in
   let this_one (y, _) = snd y.Vbd.id = snd vbd_id in
-  try List.find this_one vbds
-  with Not_found ->
-    Printf.fprintf stderr "Failed to find VBD: %s\n" id ;
-    exit 1
+  match List.find_opt this_one vbds with
+  | Some x ->
+      x
+  | None ->
+      Printf.fprintf stderr "Failed to find VBD: %s\n" id ;
+      exit 1
 
 let cd_eject _ = function
   | None ->

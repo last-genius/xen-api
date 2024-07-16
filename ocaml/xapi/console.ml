@@ -64,14 +64,15 @@ let address_of_console __context console : address option =
           | `rdp ->
               failwith "No support for tunnelling RDP"
         in
-        let console =
-          List.find (fun x -> x.Vm.protocol = proto) s.Vm.consoles
-        in
-        Some
-          ( if console.Vm.path = "" then
-              Port console.Vm.port
-            else
-              Path console.Vm.path
+        Option.bind
+          (List.find_opt (fun x -> x.Vm.protocol = proto) s.Vm.consoles)
+          (fun console ->
+            Some
+              ( if console.Vm.path = "" then
+                  Port console.Vm.port
+                else
+                  Path console.Vm.path
+              )
           )
       with e ->
         debug "%s" (Printexc.to_string e) ;
@@ -152,15 +153,18 @@ let ws_proxy __context req protocol address s =
     (fun () -> Option.iter (fun sock -> Unix.close sock) sock)
 
 let default_console_of_vm ~__context ~self =
-  try
-    let consoles = Db.VM.get_consoles ~__context ~self in
-    let protocols =
-      List.map (fun self -> Db.Console.get_protocol ~__context ~self) consoles
-    in
-    fst (List.find (fun (_, p) -> p = `rfb) (List.combine consoles protocols))
-  with _ ->
-    error "Failed to find default VNC console for VM" ;
-    raise Failure
+  let consoles = Db.VM.get_consoles ~__context ~self in
+  let protocols =
+    List.map (fun self -> Db.Console.get_protocol ~__context ~self) consoles
+  in
+  match
+    List.find_opt (fun (_, p) -> p = `rfb) (List.combine consoles protocols)
+  with
+  | Some x ->
+      fst x
+  | None ->
+      error "Failed to find default VNC console for VM" ;
+      raise Failure
 
 let console_of_request __context req =
   (* First check the request looks valid *)

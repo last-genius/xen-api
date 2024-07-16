@@ -390,8 +390,8 @@ let parse_update_info xml =
             false
       in
       let name_description =
-        match List.find is_name_description_node children with
-        | Xml.Element ("name-description", _, [Xml.PCData s]) ->
+        match List.find_opt is_name_description_node children with
+        | Some (Xml.Element ("name-description", _, [Xml.PCData s])) ->
             s
         | _ ->
             raise

@@ -62,7 +62,7 @@ let previous_longest_prefix x =
       (fun a b -> compare (String.length b) (String.length a))
       test_strings
   in
-  try Some (List.find (fun uri -> is_prefix uri x) uris) with _ -> None
+  List.find_opt (fun uri -> is_prefix uri x) uris
 
 let _ =
   check1 () ;

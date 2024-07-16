@@ -26,15 +26,11 @@ let make_iscsi_ip pool = Printf.sprintf "192.168.%d.200" (pool.ipbase + 2)
 
 let find_iscsi_iso session_id =
   let vdis = Client.VDI.get_all ~rpc ~session_id in
-  try
-    Some
-      (List.find
-         (fun vdi ->
-           Client.VDI.get_name_label ~rpc ~session_id ~self:vdi = iscsi_vm_iso
-         )
-         vdis
-      )
-  with _ -> None
+  List.find_opt
+    (fun vdi ->
+      Client.VDI.get_name_label ~rpc ~session_id ~self:vdi = iscsi_vm_iso
+    )
+    vdis
 
 (** Create the VM with the iscsi iso attached *)
 let make_iscsi session_id pool network =

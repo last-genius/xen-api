@@ -272,12 +272,13 @@ let valid_operations ~expensive_sharing_checks ~__context record _ref' : table =
           vbd_records
       in
       let someones_got_rw_access =
-        try
-          let (_ : Db_actions.vBD_t) =
-            List.find (fun vbd -> vbd.Db_actions.vBD_mode = `RW) vbds_to_check
-          in
-          true
-        with _ -> false
+        match
+          List.find_opt (fun vbd -> vbd.Db_actions.vBD_mode = `RW) vbds_to_check
+        with
+        | Some (_ : Db_actions.vBD_t) ->
+            true
+        | None ->
+            false
       in
       let need_write = record.Db_actions.vBD_mode = `RW in
       (* Read-only access doesn't require VDI to be marked sharable *)

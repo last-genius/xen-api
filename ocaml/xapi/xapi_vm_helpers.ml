@@ -894,14 +894,13 @@ let vm_can_run_on_host ~__context ~vm ~snapshot ~do_memory_check host =
     true
   in
   let host_evacuate_in_progress =
-    try
-      let _ =
-        List.find
-          (fun s -> snd s = `evacuate)
-          (Db.Host.get_current_operations ~__context ~self:host)
-      in
-      false
-    with _ -> true
+    Option.fold
+      (List.find_opt
+         (fun s -> snd s = `evacuate)
+         (Db.Host.get_current_operations ~__context ~self:host)
+      )
+      ~some:(fun _ -> false)
+      ~none:true
   in
   try
     host_has_proper_version ()

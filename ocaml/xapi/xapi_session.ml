@@ -317,7 +317,7 @@ let get_intersection ~__context subject_ids_in_db subject_identifier
 
 let get_subject_in_intersection ~__context subjects_in_db intersection =
   Context.with_tracing ~__context __FUNCTION__ @@ fun __context ->
-  List.find
+  List.find_opt
     (fun subj ->
       (* is this the subject ref that returned the non-empty intersection?*)
       List.hd intersection
@@ -546,33 +546,33 @@ let revalidate_external_session ~__context ~session =
                 debug "updated validation time for session %s, sid %s "
                   (trackid session) authenticated_user_sid ;
                 (* let's also update the session's subject ref *)
-                try
-                  let subject_in_intersection =
-                    get_subject_in_intersection ~__context subjects_in_db
-                      intersection
-                  in
-                  if
-                    subject_in_intersection
-                    <> Db.Session.get_subject ~__context ~self:session
-                  then (
-                    (* the subject in the intersection has changed!!! *)
-                    Db.Session.set_subject ~__context ~self:session
-                      ~value:subject_in_intersection ;
-                    debug "updated subject for session %s, sid %s "
-                      (trackid session) authenticated_user_sid
-                  )
-                with Not_found ->
-                  (* subject ref for intersection's sid does not exist in our metadata!!! *)
-                  (* this should never happen, it's an internal metadata inconsistency between steps 2b and 2c *)
-                  let msg =
-                    Printf.sprintf
-                      "Subject (identifier %s) is not present in this pool, \
-                       destroying session %s"
-                      authenticated_user_sid (trackid session)
-                  in
-                  debug "%s" msg ;
-                  (* we must destroy the session in this case *)
-                  destroy_db_session ~__context ~self:session
+                match
+                  get_subject_in_intersection ~__context subjects_in_db
+                    intersection
+                with
+                | Some subject_in_intersection ->
+                    if
+                      subject_in_intersection
+                      <> Db.Session.get_subject ~__context ~self:session
+                    then (
+                      (* the subject in the intersection has changed!!! *)
+                      Db.Session.set_subject ~__context ~self:session
+                        ~value:subject_in_intersection ;
+                      debug "updated subject for session %s, sid %s "
+                        (trackid session) authenticated_user_sid
+                    )
+                | None ->
+                    (* subject ref for intersection's sid does not exist in our metadata!!! *)
+                    (* this should never happen, it's an internal metadata inconsistency between steps 2b and 2c *)
+                    let msg =
+                      Printf.sprintf
+                        "Subject (identifier %s) is not present in this pool, \
+                         destroying session %s"
+                        authenticated_user_sid (trackid session)
+                    in
+                    debug "%s" msg ;
+                    (* we must destroy the session in this case *)
+                    destroy_db_session ~__context ~self:session
               )
             with Auth_signature.Subject_cannot_be_resolved | Not_found ->
               (* user was not found in external directory in order to obtain group membership *)
@@ -1068,8 +1068,8 @@ let login_with_password ~__context ~uname ~pwd ~version:_ ~originator =
                         let subject =
                           (* return reference for the subject obj in the db *)
                           (* obs: this obj ref can point to either a user or a group contained in the local subject db list *)
-                          try
-                            List.find
+                          match
+                            List.find_opt
                               (fun subj ->
                                 (* is this the subject ref that returned the non-empty intersection?*)
                                 List.hd intersection
@@ -1079,22 +1079,25 @@ let login_with_password ~__context ~uname ~pwd ~version:_ ~originator =
                                   )
                               )
                               subjects_in_db
-                            (* goes through exactly the same subject list that we went when computing the intersection, *)
-                            (* so that no one is able to undetectably remove/add another subject with the same subject_identifier *)
-                            (* between that time 2.2 and now 2.3 *)
-                          with Not_found ->
-                            (* this should never happen, it shows an inconsistency in the db between 2.2 and 2.3 *)
-                            let msg =
-                              Printf.sprintf
-                                "Subject %s (identifier %s, from %s) is not \
-                                 present in this pool"
-                                uname subject_identifier
-                                (Context.get_origin __context)
-                            in
-                            debug "%s" msg ;
-                            thread_delay_and_raise_error
-                              ~error:Api_errors.session_authorization_failed
-                              uname msg
+                          with
+                          | Some x ->
+                              x
+                          (* goes through exactly the same subject list that we went when computing the intersection, *)
+                          (* so that no one is able to undetectably remove/add another subject with the same subject_identifier *)
+                          (* between that time 2.2 and now 2.3 *)
+                          | None ->
+                              (* this should never happen, it shows an inconsistency in the db between 2.2 and 2.3 *)
+                              let msg =
+                                Printf.sprintf
+                                  "Subject %s (identifier %s, from %s) is not \
+                                   present in this pool"
+                                  uname subject_identifier
+                                  (Context.get_origin __context)
+                              in
+                              debug "%s" msg ;
+                              thread_delay_and_raise_error
+                                ~error:Api_errors.session_authorization_failed
+                                uname msg
                         in
                         login_no_password_common ~__context ~uname:(Some uname)
                           ~originator

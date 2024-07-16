@@ -35,8 +35,13 @@ let validate_kvpair field_name requirements (key, value) =
   in
   (* Try to find a required property requirement with this name. *)
   let requirement =
-    try List.find (fun requirement -> requirement.key = key) requirements
-    with Not_found -> fail ()
+    match
+      List.find_opt (fun requirement -> requirement.key = key) requirements
+    with
+    | Some x ->
+        x
+    | None ->
+        fail ()
   in
   (* Check whether the proposed value for this property is allowed. *)
   if not (requirement.is_valid_value value) then fail ()
@@ -87,13 +92,9 @@ let err field key value =
   raise (Api_errors.Server_error (Api_errors.invalid_value, [msg; value]))
 
 let mem value range =
-  try
-    Some
-      (List.find
-         (fun r -> String.lowercase_ascii value = String.lowercase_ascii r)
-         range
-      )
-  with Not_found -> None
+  List.find_opt
+    (fun r -> String.lowercase_ascii value = String.lowercase_ascii r)
+    range
 
 let assert_value ~field ~key ~attr ~value =
   let err v = err field key v in

@@ -111,20 +111,22 @@ let match_error_tag (lines : string list) =
     | [] ->
         false
     | line :: rest -> (
-      try
-        ignore (List.find (fun w -> w = err_pattern) (split_to_words line)) ;
-        true
-      with Not_found -> has_err rest err_pattern
+      match List.exists (fun w -> w = err_pattern) (split_to_words line) with
+      | true ->
+          true
+      | false ->
+          has_err rest err_pattern
     )
   in
-  try
-    let _, errtag =
-      List.find
-        (fun (err_pattern, _) -> has_err lines err_pattern)
-        err_catch_list
-    in
-    errtag
-  with Not_found -> Auth_signature.E_GENERIC
+  match
+    List.find_opt
+      (fun (err_pattern, _) -> has_err lines err_pattern)
+      err_catch_list
+  with
+  | Some (_, errtag) ->
+      errtag
+  | None ->
+      Auth_signature.E_GENERIC
 
 let extract_sid_from_group_list group_list =
   List.map

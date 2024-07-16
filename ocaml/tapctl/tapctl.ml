@@ -125,12 +125,10 @@ module Dummy = struct
     find_next_unused_number pids
 
   let get_entry_from_pid pid list =
-    try Some (List.find (fun entry -> entry.d_pid = Some pid) list)
-    with _ -> None
+    List.find_opt (fun entry -> entry.d_pid = Some pid) list
 
   let get_entry_from_minor minor list =
-    try Some (List.find (fun entry -> entry.d_minor = Some minor) list)
-    with _ -> None
+    List.find_opt (fun entry -> entry.d_minor = Some minor) list
 
   let allocate ctx =
     with_lock d_lock (fun () ->

@@ -52,25 +52,28 @@ let find_or_create ~__context pgpu =
   let pci = Db.PGPU.get_PCI ~__context ~self:pgpu in
   let pci_rec = Db.PCI.get_record_internal ~__context ~self:pci in
   let gpu_type = Xapi_pci.string_of_pci ~__context ~self:pci in
-  try
-    List.find
+  match
+    List.find_opt
       (fun rf ->
         let rc = Db.GPU_group.get_record_internal ~__context ~self:rf in
         rc.Db_actions.gPU_group_GPU_types = [gpu_type]
       )
       (Db.GPU_group.get_all ~__context)
-  with Not_found ->
-    let name_label =
-      "Group of "
-      ^ pci_rec.Db_actions.pCI_vendor_name
-      ^ " "
-      ^ pci_rec.Db_actions.pCI_device_name
-      ^ " GPUs"
-    in
-    let group =
-      create ~__context ~name_label ~name_description:"" ~other_config:[]
-    in
-    group
+  with
+  | Some x ->
+      x
+  | None ->
+      let name_label =
+        "Group of "
+        ^ pci_rec.Db_actions.pCI_vendor_name
+        ^ " "
+        ^ pci_rec.Db_actions.pCI_device_name
+        ^ " GPUs"
+      in
+      let group =
+        create ~__context ~name_label ~name_description:"" ~other_config:[]
+      in
+      group
 
 module VGPU_type_set = Set.Make (struct
   type t = API.ref_VGPU_type

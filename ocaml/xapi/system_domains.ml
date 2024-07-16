@@ -202,16 +202,19 @@ let ip_of ~__context driver =
   let hin = Helpers.get_host_internal_management_network ~__context in
   let ip =
     let vif =
-      try
-        List.find
+      match
+        List.find_opt
           (fun vif -> Db.VIF.get_network ~__context ~self:vif = hin)
           vifs
-      with Not_found ->
-        failwith
-          (Printf.sprintf
-             "driver domain %s has no VIF on host internal management network"
-             (Ref.string_of driver)
-          )
+      with
+      | Some x ->
+          x
+      | None ->
+          failwith
+            (Printf.sprintf
+               "driver domain %s has no VIF on host internal management network"
+               (Ref.string_of driver)
+            )
     in
     match Xapi_udhcpd.get_ip ~__context vif with
     | Some (a, b, c, d) ->

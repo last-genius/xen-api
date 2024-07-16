@@ -274,13 +274,21 @@ let iscsi_vm_iso_must_exist session_id =
 let create_sdk_pool session_id sdkname pool_name key ipbase =
   iscsi_vm_iso_must_exist session_id ;
   default_sr_must_be_suitable session_id ;
-  let pool = List.find (fun p -> p.id = pool_name) pools in
-  let pool = {pool with key; ipbase} in
+  let pool =
+    match List.find_opt (fun p -> p.id = pool_name) pools with
+    | Some x ->
+        {x with key; ipbase}
+    | None ->
+        debug ~out:stderr "pool '%s' not found" pool_name ;
+        exit 1
+  in
   let template =
-    try List.hd (Client.VM.get_by_name_label ~rpc ~session_id ~label:sdkname)
-    with _ ->
-      debug ~out:stderr "template '%s' not found" sdkname ;
-      exit 1
+    match Client.VM.get_by_name_label ~rpc ~session_id ~label:sdkname with
+    | x :: _ ->
+        x
+    | [] ->
+        debug ~out:stderr "template '%s' not found" sdkname ;
+        exit 1
   in
   let uuid = Client.VM.get_uuid ~rpc ~session_id ~self:template in
   debug "Creating test pool '%s' using SDK template uuid=%s" pool.id uuid ;

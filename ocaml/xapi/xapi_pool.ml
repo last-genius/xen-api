@@ -138,24 +138,23 @@ let pre_join_checks ~__context ~rpc ~session_id ~force =
            			 * This will fail with v6d_failure if v6d is not running. *)
         let editions = V6_client.get_editions "assert_restrictions_match" in
         let edition_to_int e =
-          try
-            V6_interface.(
-              match List.find (fun ed -> ed.title = e) editions with
-              | ed ->
-                  ed.order
-            )
-          with Not_found ->
-            (* Happens if pool has edition "free/libre" (no v6d) *)
-            error
-              "Pool.join failed: pool has a host with edition unknown to v6d: \
-               %s"
-              e ;
-            raise
-              (Api_errors.Server_error
-                 ( Api_errors.license_host_pool_mismatch
-                 , ["Edition \"" ^ e ^ "\" from pool is not known to v6d."]
-                 )
-              )
+          V6_interface.(
+            match List.find_opt (fun ed -> ed.title = e) editions with
+            | Some ed ->
+                ed.order
+            | None ->
+                (* Happens if pool has edition "free/libre" (no v6d) *)
+                error
+                  "Pool.join failed: pool has a host with edition unknown to \
+                   v6d: %s"
+                  e ;
+                raise
+                  (Api_errors.Server_error
+                     ( Api_errors.license_host_pool_mismatch
+                     , ["Edition \"" ^ e ^ "\" from pool is not known to v6d."]
+                     )
+                  )
+          )
         in
         let min_edition l =
           List.fold_left
@@ -682,30 +681,29 @@ let pre_join_checks ~__context ~rpc ~session_id ~force =
         )
   in
   let assert_compatible_network_purpose () =
-    try
-      let my_nbdish =
-        Db.Network.get_all ~__context
-        |> List.map (fun nwk -> Db.Network.get_purpose ~__context ~self:nwk)
-        |> List.flatten
-        |> List.find (function `nbd | `insecure_nbd -> true | _ -> false)
-      in
-      let remote_nbdish =
-        Client.Network.get_all ~rpc ~session_id
-        |> List.map (fun nwk ->
-               Client.Network.get_purpose ~rpc ~session_id ~self:nwk
-           )
-        |> List.flatten
-        |> List.find (function `nbd | `insecure_nbd -> true | _ -> false)
-      in
-      if remote_nbdish <> my_nbdish then
-        raise
-          Api_errors.(
-            Server_error
-              ( operation_not_allowed
-              , ["Incompatible network purposes: nbd and insecure_nbd"]
-              )
-          )
-    with Not_found -> ()
+    let ( let* ) l r = Option.iter r l in
+    let* my_nbdish =
+      Db.Network.get_all ~__context
+      |> List.map (fun nwk -> Db.Network.get_purpose ~__context ~self:nwk)
+      |> List.flatten
+      |> List.find_opt (function `nbd | `insecure_nbd -> true | _ -> false)
+    in
+    let* remote_nbdish =
+      Client.Network.get_all ~rpc ~session_id
+      |> List.map (fun nwk ->
+             Client.Network.get_purpose ~rpc ~session_id ~self:nwk
+         )
+      |> List.flatten
+      |> List.find_opt (function `nbd | `insecure_nbd -> true | _ -> false)
+    in
+    if remote_nbdish <> my_nbdish then
+      raise
+        Api_errors.(
+          Server_error
+            ( operation_not_allowed
+            , ["Incompatible network purposes: nbd and insecure_nbd"]
+            )
+        )
     (* If either side has no network with nbd-related purpose, then no problem. *)
   in
   let assert_pool_size_unrestricted () =
@@ -947,13 +945,13 @@ and create_or_get_sr_on_master __context rpc session_id (_sr_ref, sr) :
   try Client.SR.get_by_uuid ~rpc ~session_id ~uuid:my_uuid
   with _ ->
     if sr.API.sR_is_tools_sr then (* find the tools SR and return it *)
-      try
-        Client.SR.get_all_records ~rpc ~session_id
-        |> List.find (fun (_, sr) -> sr.API.sR_is_tools_sr)
-        |> fun (ref, _) -> ref
-      with Not_found ->
-        let msg = Printf.sprintf "can't find SR %s of tools iso" my_uuid in
-        raise Api_errors.(Server_error (internal_error, [msg]))
+      let c = Client.SR.get_all_records ~rpc ~session_id in
+      match List.find_opt (fun (_, sr) -> sr.API.sR_is_tools_sr) c with
+      | Some (ref, _) ->
+          ref
+      | None ->
+          let msg = Printf.sprintf "can't find SR %s of tools iso" my_uuid in
+          raise Api_errors.(Server_error (internal_error, [msg]))
     else (
       debug "Found no SR with uuid = '%s' on the master, so creating one."
         my_uuid ;
@@ -1049,30 +1047,31 @@ let create_or_get_network_on_master __context rpc session_id
   in
   let new_network_ref =
     if is_physical || is_himn then (
-      try
-        (* Physical network or Host Internal Management Network:
-           			 * try to join an existing network with the same bridge name, or create one.
-           			 * This relies on the convention that physical PIFs with the same device name need to be connected.
-           			 * Furthermore, there should be only one Host Internal Management Network in a pool. *)
-        let pool_networks = Client.Network.get_all_records ~rpc ~session_id in
-        let net_ref, _ =
-          List.find
-            (fun (_, net) -> net.API.network_bridge = my_bridge)
-            pool_networks
-        in
-        net_ref
-      with _ ->
-        debug
-          "Found no network with bridge = '%s' on the master, so creating one."
-          my_bridge ;
-        Client.Network.pool_introduce ~rpc ~session_id
-          ~name_label:network.API.network_name_label
-          ~name_description:network.API.network_name_description
-          ~mTU:network.API.network_MTU
-          ~other_config:network.API.network_other_config
-          ~bridge:network.API.network_bridge
-          ~managed:network.API.network_managed
-          ~purpose:network.API.network_purpose
+      (* Physical network or Host Internal Management Network:
+         			 * try to join an existing network with the same bridge name, or create one.
+         			 * This relies on the convention that physical PIFs with the same device name need to be connected.
+         			 * Furthermore, there should be only one Host Internal Management Network in a pool. *)
+      let pool_networks = Client.Network.get_all_records ~rpc ~session_id in
+      match
+        List.find_opt
+          (fun (_, net) -> net.API.network_bridge = my_bridge)
+          pool_networks
+      with
+      | Some (net_ref, _) ->
+          net_ref
+      | None ->
+          debug
+            "Found no network with bridge = '%s' on the master, so creating \
+             one."
+            my_bridge ;
+          Client.Network.pool_introduce ~rpc ~session_id
+            ~name_label:network.API.network_name_label
+            ~name_description:network.API.network_name_description
+            ~mTU:network.API.network_MTU
+            ~other_config:network.API.network_other_config
+            ~bridge:network.API.network_bridge
+            ~managed:network.API.network_managed
+            ~purpose:network.API.network_purpose
     ) else (
       debug "Recreating network '%s' as internal network."
         network.API.network_name_label ;

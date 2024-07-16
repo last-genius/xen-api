@@ -117,24 +117,24 @@ let permission_of_action ?args ~keys _action =
           debug "DENYING access: no 'key' argument in the action %s" action ;
           get_keyERR_permission_name action "DENY_NOKEY"
       | Some (Rpc.String key_name_in_args) -> (
-        try
-          let key_name =
-            List.find
-              (fun key_name ->
-                if String.ends_with ~suffix:"*" key_name then
-                  (* resolve wildcards at the end *)
-                  String.starts_with
-                    ~prefix:(String.sub key_name 0 (String.length key_name - 1))
-                    key_name_in_args
-                else (* no wildcards to resolve *)
-                  key_name = key_name_in_args
-              )
-              keys
-          in
-          get_key_permission_name action (String.lowercase_ascii key_name)
-        with Not_found ->
-          (* expected, key_in_args is not rbac-protected *)
-          action
+        match
+          List.find_opt
+            (fun key_name ->
+              if String.ends_with ~suffix:"*" key_name then
+                (* resolve wildcards at the end *)
+                String.starts_with
+                  ~prefix:(String.sub key_name 0 (String.length key_name - 1))
+                  key_name_in_args
+              else (* no wildcards to resolve *)
+                key_name = key_name_in_args
+            )
+            keys
+        with
+        | Some key_name ->
+            get_key_permission_name action (String.lowercase_ascii key_name)
+        | None ->
+            (* expected, key_in_args is not rbac-protected *)
+            action
       )
       | Some value ->
           (* this should never happen *)

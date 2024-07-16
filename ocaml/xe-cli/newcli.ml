@@ -116,19 +116,18 @@ let rec read_rest_of_headers ic =
       []
     else (
       debug "read '%s'\n" r ;
-      let hdr =
-        List.find
+      match
+        List.find_opt
           (fun s -> String.startswith (s ^ ": ") (String.lowercase_ascii r))
           hdrs
-      in
-      let value = end_of_string r (String.length hdr + 2) in
-      (hdr, value) :: read_rest_of_headers ic
+      with
+      | Some hdr ->
+          let value = end_of_string r (String.length hdr + 2) in
+          (hdr, value) :: read_rest_of_headers ic
+      | None ->
+          read_rest_of_headers ic
     )
-  with
-  | Not_found ->
-      read_rest_of_headers ic
-  | _ ->
-      []
+  with _ -> []
 
 let parse_url url =
   let parse uri =

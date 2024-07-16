@@ -222,8 +222,7 @@ let restart_nolock () =
   in
   wait_for_pid 0
 
-let find_lease_nolock vif =
-  try Some (List.find (fun l -> l.vif = vif) !assigned) with Not_found -> None
+let find_lease_nolock vif = List.find_opt (fun l -> l.vif = vif) !assigned
 
 (* We only expire leases when the VIFs are *destroyed* from the database. Otherwise
    we get into trouble with sequences like VM.suspend, VM.resume *)

@@ -31,14 +31,12 @@ module Networks = Generic.MakeStateless (struct
     | [] ->
         T (root, children)
     | node :: rest_of_path -> (
-      try
-        let (T (_, children_of_node)) =
-          List.find (fun (T (n, _)) -> n = node) children
-        in
-        let t = add_path_to_tree (T (node, children_of_node)) rest_of_path in
-        T (root, t :: List.filter (fun (T (n, _)) -> n <> node) children)
-      with Not_found ->
-        T (root, add_path_to_tree (T (node, [])) rest_of_path :: children)
+      match List.find_opt (fun (T (n, _)) -> n = node) children with
+      | Some (T (_, children_of_node)) ->
+          let t = add_path_to_tree (T (node, children_of_node)) rest_of_path in
+          T (root, t :: List.filter (fun (T (n, _)) -> n <> node) children)
+      | None ->
+          T (root, add_path_to_tree (T (node, [])) rest_of_path :: children)
     )
 
   let construct_tree tree path =
@@ -51,12 +49,11 @@ module Networks = Generic.MakeStateless (struct
     | [] ->
         List.map (fun (T (node, _)) -> node) children
     | node :: rest_of_path -> (
-      try
-        let (T (_, children_of_node)) =
-          List.find (fun (T (n, _)) -> n = node) children
-        in
-        list_helper children_of_node rest_of_path
-      with Not_found -> []
+      match List.find_opt (fun (T (n, _)) -> n = node) children with
+      | Some (T (_, children_of_node)) ->
+          list_helper children_of_node rest_of_path
+      | None ->
+          []
     )
 
   let list (T (_root, children)) path =
@@ -207,8 +204,8 @@ module Initial_guest_metrics = Generic.MakeStateless (struct
             raise (Failure "Can't add a leaf on a tree node")
       )
       | node :: rest_paths -> (
-        try
-          let t = List.find (has_name node) children in
+        match List.find_opt (has_name node) children with
+        | Some t -> (
           match t with
           | Lf (_, _) ->
               raise (Failure "Can't overwrite an existing leaf")
@@ -221,12 +218,13 @@ module Initial_guest_metrics = Generic.MakeStateless (struct
                 ( root
                 , mt :: List.filter (fun n -> not (has_name node n)) children
                 )
-        with Not_found ->
-          Mt
-            ( root
-            , add_leaf_to_mtree rest_paths leaf_value (Mt (node, []))
-              :: children
-            )
+        )
+        | None ->
+            Mt
+              ( root
+              , add_leaf_to_mtree rest_paths leaf_value (Mt (node, []))
+                :: children
+              )
       )
     )
 
@@ -240,13 +238,13 @@ module Initial_guest_metrics = Generic.MakeStateless (struct
     | [] ->
         List.map get_name children
     | node :: rest_paths -> (
-      try
-        match List.find (has_name node) children with
-        | Lf (_, _) ->
-            []
-        | Mt (_, children_of_node) ->
-            list_helper children_of_node rest_paths
-      with Not_found -> []
+      match List.find_opt (has_name node) children with
+      | Some (Lf (_, _)) ->
+          []
+      | Some (Mt (_, children_of_node)) ->
+          list_helper children_of_node rest_paths
+      | None ->
+          []
     )
 
   let list mtree path =
@@ -267,10 +265,10 @@ module Initial_guest_metrics = Generic.MakeStateless (struct
       match mtree with
       | Lf (l, v) ->
           lookup_helper (Lf (l, v)) rest_paths
-      | Mt (_, children) -> (
-        try lookup_helper (List.find (has_name node) children) rest_paths
-        with Not_found -> None
-      )
+      | Mt (_, children) ->
+          Option.bind
+            (List.find_opt (has_name node) children)
+            (fun x -> lookup_helper x rest_paths)
     )
 
   let lookup mtree path =

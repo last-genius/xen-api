@@ -128,12 +128,13 @@ let get_deprecated_release lifecycle =
   lifecycle_matcher Lifecycle.Published lifecycle
 
 let get_release_branding codename =
-  try
-    let found =
-      List.find (fun x -> code_name_of_release x = codename) release_order
-    in
-    found.branding
-  with Not_found -> codename
+  match
+    List.find_opt (fun x -> code_name_of_release x = codename) release_order
+  with
+  | Some found ->
+      found.branding
+  | None ->
+      codename
 
 let group_params_per_release params =
   let same_release p1 p2 =

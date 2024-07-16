@@ -574,12 +574,13 @@ let intra_pool_vdi_remap ~__context vm vdi_map =
   in
   List.iter
     (fun (vdi, callback) ->
-      try
-        let mirror_record =
-          List.find (fun mr -> mr.mr_local_vdi_reference = vdi) vdi_map
-        in
-        callback mirror_record.mr_remote_vdi_reference
-      with Not_found -> ()
+      match
+        List.find_opt (fun mr -> mr.mr_local_vdi_reference = vdi) vdi_map
+      with
+      | Some mirror_record ->
+          callback mirror_record.mr_remote_vdi_reference
+      | None ->
+          ()
     )
     vdis_and_callbacks
 

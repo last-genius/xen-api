@@ -438,9 +438,11 @@ module SMAPIv1 : Server_impl = struct
         ~subtask_of:(Ref.of_string dbg) (fun __context ->
           let local_vdis = scan __context ~dbg ~sr in
           let find_sm_vdi ~vdi ~vdi_info_list =
-            try List.find (fun x -> x.vdi = vdi) vdi_info_list
-            with Not_found ->
-              raise (Storage_error (Vdi_does_not_exist (s_of_vdi vdi)))
+            match List.find_opt (fun x -> x.vdi = vdi) vdi_info_list with
+            | Some x ->
+                x
+            | None ->
+                raise (Storage_error (Vdi_does_not_exist (s_of_vdi vdi)))
           in
           let assert_content_ids_match ~vdi_info1 ~vdi_info2 =
             if vdi_info1.content_id <> vdi_info2.content_id then

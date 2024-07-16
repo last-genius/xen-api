@@ -61,8 +61,7 @@ module Legend = struct
   *)
 
   let find_data_source dsl (name, _, _, _) =
-    try Some (List.find (fun ds -> ds.API.data_source_name_label = name) dsl)
-    with Not_found -> None
+    List.find_opt (fun ds -> ds.API.data_source_name_label = name) dsl
 end
 
 type interval = [`Seconds | `Minute | `Hour | `Day | `Other of int]

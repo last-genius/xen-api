@@ -300,15 +300,16 @@ let get_field_type fieldname record =
   then
     let i = String.index fieldname ':' in
     let real_fieldname = String.sub fieldname 0 i in
-    try
-      let field = List.find (fun field -> field.name = real_fieldname) record in
-      if field.get_set <> None then
-        Set field.name
-      else if field.get_map <> None then
-        Map field.name
-      else
-        failwith ("Field '" ^ field.name ^ "' is not a set or map")
-    with Not_found -> failwith ("Unknown field '" ^ fieldname ^ "'")
+    match List.find_opt (fun field -> field.name = real_fieldname) record with
+    | Some field ->
+        if field.get_set <> None then
+          Set field.name
+        else if field.get_map <> None then
+          Map field.name
+        else
+          failwith ("Field '" ^ field.name ^ "' is not a set or map")
+    | None ->
+        failwith ("Unknown field '" ^ fieldname ^ "'")
   else
     (* Old behaviour is to match like this: param-name-key=value *)
     (* Find all the maps, then sort in length order, longest first *)
@@ -318,34 +319,38 @@ let get_field_type fieldname record =
         (fun a b -> compare (String.length b.name) (String.length a.name))
         mapfields
     in
-    try
-      (* Find the first (longest) matching field *)
-      let field =
-        List.find
-          (fun field ->
-            Astring.String.is_prefix ~affix:(field.name ^ "-") fieldname
-          )
-          mapfields
-      in
-      Map field.name
-    with Not_found -> (
-      let setfields = List.filter (fun field -> field.get_set <> None) record in
-      let setfields =
-        List.sort
-          (fun a b -> compare (String.length b.name) (String.length a.name))
-          setfields
-      in
-      try
-        let field =
-          List.find
+
+    (* Find the first (longest) matching field *)
+    match
+      List.find_opt
+        (fun field ->
+          Astring.String.is_prefix ~affix:(field.name ^ "-") fieldname
+        )
+        mapfields
+    with
+    | Some field ->
+        Map field.name
+    | None -> (
+        let setfields =
+          List.filter (fun field -> field.get_set <> None) record
+        in
+        let setfields =
+          List.sort
+            (fun a b -> compare (String.length b.name) (String.length a.name))
+            setfields
+        in
+        match
+          List.find_opt
             (fun field ->
               Astring.String.is_prefix ~affix:(field.name ^ "-") fieldname
             )
             setfields
-        in
-        Set field.name
-      with _ -> failwith ("Unknown field '" ^ fieldname ^ "'")
-    )
+        with
+        | Some field ->
+            Set field.name
+        | None ->
+            failwith ("Unknown field '" ^ fieldname ^ "'")
+      )
 
 let filter_records_on_set_param records (k, v) s =
   (* On entry here, s is the name of the parameter, and k will be of the form s[:-]contains *)
@@ -4104,15 +4109,18 @@ let console fd _printer rpc session_id params =
     | [vm_r] -> (
         let vm = vm_r.getref () in
         let cs = Client.VM.get_consoles ~rpc ~session_id ~self:vm in
-        try
-          List.find
+        match
+          List.find_opt
             (fun c ->
               Client.Console.get_protocol ~rpc ~session_id ~self:c = `vt100
             )
             cs
-        with Not_found ->
-          marshal fd (Command (PrintStderr "No text console available\n")) ;
-          raise (ExitWithError 1)
+        with
+        | Some x ->
+            x
+        | None ->
+            marshal fd (Command (PrintStderr "No text console available\n")) ;
+            raise (ExitWithError 1)
       )
     | [] ->
         marshal fd (Command (PrintStderr "No VM found\n")) ;
@@ -4589,16 +4597,19 @@ let vm_migrate printer rpc session_id params =
           in
           if List.mem_assoc "host" params then
             let x = List.assoc "host" params in
-            try
-              List.find
+            match
+              List.find_opt
                 (fun (_, h) ->
                   h.API.host_hostname = x
                   || h.API.host_name_label = x
                   || h.API.host_uuid = x
                 )
                 all
-            with Not_found ->
-              failwith (Printf.sprintf "Failed to find host: %s" x)
+            with
+            | Some x ->
+                x
+            | None ->
+                failwith (Printf.sprintf "Failed to find host: %s" x)
           else
             List.hd all
         in
@@ -4609,16 +4620,19 @@ let vm_migrate printer rpc session_id params =
           in
           if List.mem_assoc "remote-network" params then
             let x = List.assoc "remote-network" params in
-            try
-              List.find
+            match
+              List.find_opt
                 (fun (_, net) ->
                   net.API.network_bridge = x
                   || net.API.network_name_label = x
                   || net.API.network_uuid = x
                 )
                 all
-            with Not_found ->
-              failwith (Printf.sprintf "Failed to find network: %s" x)
+            with
+            | Some x ->
+                x
+            | None ->
+                failwith (Printf.sprintf "Failed to find network: %s" x)
           else
             let pifs = host_record.API.host_PIFs in
             let management_pifs =

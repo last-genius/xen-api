@@ -506,8 +506,8 @@ let destroy ~__context ~self =
       let allmsgs =
         List.filter (fun file -> not (Sys.is_directory file)) allfiles
       in
-      try
-        List.find
+      match
+        List.find_opt
           (fun msg_fname ->
             try
               let ic = open_in msg_fname in
@@ -520,13 +520,16 @@ let destroy ~__context ~self =
             with _ -> false
           )
           allmsgs
-      with _ ->
-        raise
-          (Api_errors.Server_error
-             ( Api_errors.handle_invalid
-             , [Datamodel_common._message; Ref.string_of self]
-             )
-          )
+      with
+      | Some x ->
+          x
+      | None ->
+          raise
+            (Api_errors.Server_error
+               ( Api_errors.handle_invalid
+               , [Datamodel_common._message; Ref.string_of self]
+               )
+            )
     )
   in
   let base_filename = Filename.basename fullpath in

@@ -178,28 +178,27 @@ let assert_can_restore_backup ~__context rpc session_id (x : header) =
   in
   let get_vm_uuid_of_snap s =
     let snapshot_of = Ref.string_of s.API.vM_snapshot_of in
-    try
-      if Xstringext.String.startswith "Ref:" snapshot_of then
-        (* This should be a snapshot in the archive *)
-        let v =
-          List.find
-            (fun v -> v.cls = Datamodel_common._vm && v.id = snapshot_of)
-            x.objects
-        in
-        let v = get_vm_record v.snapshot in
-        Some v.API.vM_uuid
-      else if Xstringext.String.startswith Ref.ref_prefix snapshot_of then
-        (* This should be a snapshot in a live system *)
-        if Db.is_valid_ref __context s.API.vM_snapshot_of then
-          Some (Db.VM.get_uuid ~__context ~self:s.API.vM_snapshot_of)
-        else
-          Some
-            (List.assoc Db_names.uuid
-               (Helpers.vm_string_to_assoc s.API.vM_snapshot_metadata)
-            )
+    if Xstringext.String.startswith "Ref:" snapshot_of then
+      (* This should be a snapshot in the archive *)
+      let ( let* ) = Option.bind in
+      let* v =
+        List.find_opt
+          (fun v -> v.cls = Datamodel_common._vm && v.id = snapshot_of)
+          x.objects
+      in
+      let v = get_vm_record v.snapshot in
+      Some v.API.vM_uuid
+    else if Xstringext.String.startswith Ref.ref_prefix snapshot_of then
+      (* This should be a snapshot in a live system *)
+      if Db.is_valid_ref __context s.API.vM_snapshot_of then
+        Some (Db.VM.get_uuid ~__context ~self:s.API.vM_snapshot_of)
       else
-        None
-    with _ -> None
+        Some
+          (List.assoc Db_names.uuid
+             (Helpers.vm_string_to_assoc s.API.vM_snapshot_metadata)
+          )
+    else
+      None
   in
 
   (* This function should be called when a VM/snapshot to import has the same
@@ -1198,17 +1197,17 @@ module GPUGroup : HandlerTools = struct
   let precheck __context config rpc session_id _state x =
     let gpu_group_record = API.gPU_group_t_of_rpc x.snapshot in
     let groups = Client.GPU_group.get_all_records ~rpc ~session_id in
-    try
-      let group, _ =
-        List.find
-          (fun (_, groupr) ->
-            groupr.API.gPU_group_GPU_types
-            = gpu_group_record.API.gPU_group_GPU_types
-          )
-          groups
-      in
-      Found_GPU_group group
-    with Not_found -> (
+    match
+      List.find_opt
+        (fun (_, groupr) ->
+          groupr.API.gPU_group_GPU_types
+          = gpu_group_record.API.gPU_group_GPU_types
+        )
+        groups
+    with
+    | Some (group, _) ->
+        Found_GPU_group group
+    | None -> (
       match config.import_type with
       | Metadata_import _ ->
           (* In vm_metadata_only mode the GPU group must exist *)

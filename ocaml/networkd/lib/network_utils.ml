@@ -349,24 +349,21 @@ module Sysfs = struct
         (Vf_sysfs_path_not_found, "Can not get child vfs sysfs paths for " ^ dev)
 
   let device_index_of_vf parent_dev pcibuspath =
-    try
-      let open Rresult.R.Infix in
-      get_child_vfs_sysfs_paths parent_dev >>= fun paths ->
-      let group =
-        List.find
-          (fun x -> Astring.String.is_infix ~affix:pcibuspath (Unix.readlink x))
-          paths
-        |> Re.exec_opt (Re.Perl.compile_pat "virtfn(\\d+)")
-      in
-      match group with
-      | None ->
-          Result.Error
-            (Vf_index_not_found, "Can not get device index for " ^ pcibuspath)
-      | Some x ->
-          Ok (int_of_string (Re.Group.get x 1))
-    with _ ->
-      Result.Error
-        (Vf_index_not_found, "Can not get device index for " ^ pcibuspath)
+    let open Rresult.R.Infix in
+    get_child_vfs_sysfs_paths parent_dev >>= fun paths ->
+    match
+      Option.bind
+        (List.find_opt
+           (fun x -> Astring.String.is_infix ~affix:pcibuspath (Unix.readlink x))
+           paths
+        )
+        (fun v -> Re.exec_opt (Re.Perl.compile_pat "virtfn(\\d+)") v)
+    with
+    | None ->
+        Result.Error
+          (Vf_index_not_found, "Can not get device index for " ^ pcibuspath)
+    | Some x ->
+        Ok (int_of_string (Re.Group.get x 1))
 
   let unbind_child_vfs dev =
     let open Rresult.R.Infix in

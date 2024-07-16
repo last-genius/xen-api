@@ -209,18 +209,15 @@ let get_subject_other_config_subject_name __context self =
     ""
 
 let get_role_name_label __context self =
-  try
-    (*Xapi_role.get_name_label ~__context ~self:(Ref.of_string self)*)
-    (*DB_Action.Role.get_name_label ~__context ~self:(Ref.of_string self)*)
-    let ps =
-      Rbac_static.all_static_roles @ Rbac_static.all_static_permissions
-    in
-    let p = List.find (fun p -> Ref.ref_prefix ^ p.role_uuid = self) ps in
-    p.role_name_label
-  with e ->
-    D.debug "couldn't get Role.name_label for ref %s: %s" self
-      (ExnHelper.string_of_exn e) ;
-    ""
+  (*Xapi_role.get_name_label ~__context ~self:(Ref.of_string self)*)
+  (*DB_Action.Role.get_name_label ~__context ~self:(Ref.of_string self)*)
+  let ps = Rbac_static.all_static_roles @ Rbac_static.all_static_permissions in
+  match List.find_opt (fun p -> Ref.ref_prefix ^ p.role_uuid = self) ps with
+  | Some p ->
+      p.role_name_label
+  | None ->
+      D.debug "%s: couldn't get Role.name_label for ref %s" __FUNCTION__ self ;
+      ""
 
 let action_param_ref_getter_fn =
   [

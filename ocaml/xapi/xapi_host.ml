@@ -1357,13 +1357,15 @@ let set_hostname_live ~__context ~host ~hostname =
           [('a', 'z'); ('A', 'Z'); ('0', '9'); ('-', '-'); ('.', '.')]
         in
         while !valid && !i < len do
-          ( try
-              ignore
-                (List.find
-                   (fun (r1, r2) -> r1 <= hostname.[!i] && hostname.[!i] <= r2)
-                   range
-                )
-            with Not_found -> valid := false
+          ( match
+              List.find_opt
+                (fun (r1, r2) -> r1 <= hostname.[!i] && hostname.[!i] <= r2)
+                range
+            with
+          | Some _ ->
+              ()
+          | None ->
+              valid := false
           ) ;
           incr i
         done ;
@@ -2527,14 +2529,18 @@ let migrate_receive ~__context ~host ~network ~options:_ =
   let new_session_id = Ref.string_of new_session_id in
   let pifs = Db.Network.get_PIFs ~__context ~self:network in
   let pif =
-    try List.find (fun x -> host = Db.PIF.get_host ~__context ~self:x) pifs
-    with Not_found ->
-      raise
-        (Api_errors.Server_error
-           ( Api_errors.host_cannot_attach_network
-           , [Ref.string_of host; Ref.string_of network]
-           )
-        )
+    match
+      List.find_opt (fun x -> host = Db.PIF.get_host ~__context ~self:x) pifs
+    with
+    | Some x ->
+        x
+    | None ->
+        raise
+          (Api_errors.Server_error
+             ( Api_errors.host_cannot_attach_network
+             , [Ref.string_of host; Ref.string_of network]
+             )
+          )
   in
   let primary_address_type =
     Db.PIF.get_primary_address_type ~__context ~self:pif

@@ -421,13 +421,12 @@ let dss_hostload xc domains =
 
 let dss_netdev doms =
   let uuid_of_domid domains domid =
-    let _, uuid, _ =
-      try List.find (fun (_, _, domid') -> domid = domid') domains
-      with Not_found ->
+    match List.find_opt (fun (_, _, domid') -> domid = domid') domains with
+    | Some (_, uuid, _) ->
+        uuid
+    | None ->
         failwith
           (Printf.sprintf "Failed to find uuid corresponding to domid: %d" domid)
-    in
-    uuid
   in
   let open Network_stats in
   let stats = Network_stats.read_stats () in

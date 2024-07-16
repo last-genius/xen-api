@@ -2168,14 +2168,15 @@ let update_vm ~__context id =
                         let uuid = Uuidx.to_string (Uuidx.make ()) in
                         let location = Printf.sprintf "%s?uuid=%s" uri uuid in
                         let port =
-                          try
-                            Int64.of_int
-                              (List.find
-                                 (fun c -> c.Vm.protocol = protocol)
-                                 state.Vm.consoles
-                              )
-                                .port
-                          with Not_found -> -1L
+                          match
+                            List.find_opt
+                              (fun c -> c.Vm.protocol = protocol)
+                              state.Vm.consoles
+                          with
+                          | Some x ->
+                              Int64.of_int x.port
+                          | None ->
+                              -1L
                         in
                         Db.Console.create ~__context ~ref ~uuid
                           ~protocol:(to_xenapi_console_protocol protocol)

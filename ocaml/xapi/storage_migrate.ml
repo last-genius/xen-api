@@ -464,23 +464,27 @@ let copy' ~task ~dbg ~sr ~vdi ~url ~dest ~dest_vdi ~verify_dest =
       ) ;
   let vdis = Remote.SR.scan dbg dest in
   let remote_vdi =
-    try List.find (fun x -> x.vdi = dest_vdi) vdis
-    with Not_found ->
-      failwith
-        (Printf.sprintf "Remote VDI %s not found"
-           (Storage_interface.Vdi.string_of dest_vdi)
-        )
+    match List.find_opt (fun x -> x.vdi = dest_vdi) vdis with
+    | Some x ->
+        x
+    | None ->
+        failwith
+          (Printf.sprintf "Remote VDI %s not found"
+             (Storage_interface.Vdi.string_of dest_vdi)
+          )
   in
   let dest_content_id = remote_vdi.content_id in
   (* Find the local VDI *)
   let vdis = Local.SR.scan dbg sr in
   let local_vdi =
-    try List.find (fun x -> x.vdi = vdi) vdis
-    with Not_found ->
-      failwith
-        (Printf.sprintf "Local VDI %s not found"
-           (Storage_interface.Vdi.string_of vdi)
-        )
+    match List.find_opt (fun x -> x.vdi = vdi) vdis with
+    | Some x ->
+        x
+    | None ->
+        failwith
+          (Printf.sprintf "Local VDI %s not found"
+             (Storage_interface.Vdi.string_of vdi)
+          )
   in
   debug "copy local content_id=%s" local_vdi.content_id ;
   debug "copy remote content_id=%s" dest_content_id ;
@@ -492,15 +496,16 @@ let copy' ~task ~dbg ~sr ~vdi ~url ~dest ~dest_vdi ~verify_dest =
   ) ;
   let on_fail : (unit -> unit) list ref = ref [] in
   let base_vdi =
-    try
-      let x = (List.find (fun x -> x.content_id = dest_content_id) vdis).vdi in
-      debug "local VDI has content_id = %s; we will perform an incremental copy"
-        dest_content_id ;
-      Some x
-    with _ ->
-      debug "no local VDI has content_id = %s; we will perform a full copy"
-        dest_content_id ;
-      None
+    match List.find_opt (fun x -> x.content_id = dest_content_id) vdis with
+    | Some x ->
+        debug
+          "local VDI has content_id = %s; we will perform an incremental copy"
+          dest_content_id ;
+        Some x.vdi
+    | None ->
+        debug "no local VDI has content_id = %s; we will perform a full copy"
+          dest_content_id ;
+        None
   in
   try
     let remote_dp = Uuidx.(to_string (make ())) in
@@ -601,12 +606,14 @@ let stop ~dbg ~id =
           let sr, vdi = State.of_mirror_id id in
           let vdis = Local.SR.scan dbg sr in
           let local_vdi =
-            try List.find (fun x -> x.vdi = vdi) vdis
-            with Not_found ->
-              failwith
-                (Printf.sprintf "Local VDI %s not found"
-                   (Storage_interface.Vdi.string_of vdi)
-                )
+            match List.find_opt (fun x -> x.vdi = vdi) vdis with
+            | Some x ->
+                x
+            | None ->
+                failwith
+                  (Printf.sprintf "Local VDI %s not found"
+                     (Storage_interface.Vdi.string_of vdi)
+                  )
           in
           let local_vdi = add_to_sm_config local_vdi "mirror" "null" in
           let local_vdi = remove_from_sm_config local_vdi "base_mirror" in
@@ -615,16 +622,12 @@ let stop ~dbg ~id =
           Local.VDI.destroy dbg sr snapshot.vdi ;
           (* Destroy the snapshot, if it still exists *)
           let snap =
-            try
-              Some
-                (List.find
-                   (fun x ->
-                     List.mem_assoc "base_mirror" x.sm_config
-                     && List.assoc "base_mirror" x.sm_config = id
-                   )
-                   vdis
-                )
-            with _ -> None
+            List.find_opt
+              (fun x ->
+                List.mem_assoc "base_mirror" x.sm_config
+                && List.assoc "base_mirror" x.sm_config = id
+              )
+              vdis
           in
           ( match snap with
           | Some s ->
@@ -682,8 +685,11 @@ let start' ~task ~dbg:_ ~sr ~vdi ~dp ~url ~dest ~verify_dest =
   let dbg = dbg_and_tracing_of_task task in
   let vdis = Local.SR.scan dbg sr in
   let local_vdi =
-    try List.find (fun x -> x.vdi = vdi) vdis
-    with Not_found -> failwith "Local VDI not found"
+    match List.find_opt (fun x -> x.vdi = vdi) vdis with
+    | Some x ->
+        x
+    | None ->
+        failwith "Local VDI not found"
   in
   let id = State.mirror_id_of (sr, local_vdi.vdi) in
   debug "Adding to active local mirrors before sending: id=%s" id ;
@@ -1021,18 +1027,13 @@ let receive_start ~dbg ~sr ~vdi_info ~id ~similar =
           match acc with
           | Some _ ->
               acc
-          | None -> (
-            try
-              Some
-                (List.find
-                   (fun vdi ->
-                     vdi.content_id = content_id
-                     && vdi.virtual_size <= vdi_info.virtual_size
-                   )
-                   vdis
+          | None ->
+              List.find_opt
+                (fun vdi ->
+                  vdi.content_id = content_id
+                  && vdi.virtual_size <= vdi_info.virtual_size
                 )
-            with Not_found -> None
-          )
+                vdis
         )
         None similar
     in
@@ -1248,8 +1249,11 @@ let copy ~task ~dbg ~sr ~vdi ~dp:_ ~url ~dest ~verify_dest =
   try
     let vdis = Local.SR.scan dbg sr in
     let local_vdi =
-      try List.find (fun x -> x.vdi = vdi) vdis
-      with Not_found -> failwith (Printf.sprintf "Local VDI not found")
+      match List.find_opt (fun x -> x.vdi = vdi) vdis with
+      | Some x ->
+          x
+      | None ->
+          failwith (Printf.sprintf "Local VDI not found")
     in
     try
       let similar_vdis = Local.VDI.similar_content dbg sr vdi in
@@ -1276,18 +1280,13 @@ let copy ~task ~dbg ~sr ~vdi ~dp:_ ~url ~dest ~verify_dest =
             match acc with
             | Some _ ->
                 acc
-            | None -> (
-              try
-                Some
-                  (List.find
-                     (fun vdi ->
-                       vdi.content_id = content_id
-                       && vdi.virtual_size <= local_vdi.virtual_size
-                     )
-                     remote_vdis
+            | None ->
+                List.find_opt
+                  (fun vdi ->
+                    vdi.content_id = content_id
+                    && vdi.virtual_size <= local_vdi.virtual_size
                   )
-              with Not_found -> None
-            )
+                  remote_vdis
           )
           None similars
       in
@@ -1387,9 +1386,11 @@ let update_snapshot_info_src ~dbg ~sr ~vdi ~url ~dest ~dest_vdi ~snapshot_pairs
   end)) in
   let local_vdis = Local.SR.scan dbg sr in
   let find_vdi ~vdi ~vdi_info_list =
-    try List.find (fun x -> x.vdi = vdi) vdi_info_list
-    with Not_found ->
-      raise (Storage_error (Vdi_does_not_exist (Vdi.string_of vdi)))
+    match List.find_opt (fun x -> x.vdi = vdi) vdi_info_list with
+    | Some x ->
+        x
+    | None ->
+        raise (Storage_error (Vdi_does_not_exist (Vdi.string_of vdi)))
   in
   let snapshot_pairs_for_remote =
     List.map

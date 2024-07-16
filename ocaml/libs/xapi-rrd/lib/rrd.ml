@@ -605,24 +605,24 @@ let find_best_rras rrd pdp_interval cf start =
     in
     rra.rra_pdp_cnt >= pdp_interval && t > lasttime
   in
-  try
-    let first_ok_rra = List.find (contains_time start) rras in
-    let pdp_cnt = first_ok_rra.rra_pdp_cnt in
-    let row_cnt = first_ok_rra.rra_row_cnt in
-    let ok_rras =
-      List.filter
-        (fun rra -> rra.rra_row_cnt = row_cnt && rra.rra_pdp_cnt = pdp_cnt)
-        rras
-    in
-    ok_rras
-  with _ ->
-    let rra = List.hd (List.rev rras) in
-    let newstarttime =
-      1L
-      +++ last_pdp_time
-      --- (rrd.timestep *** Int64.of_int (rra.rra_row_cnt * rra.rra_pdp_cnt))
-    in
-    List.filter (contains_time newstarttime) rras
+  match List.find_opt (contains_time start) rras with
+  | Some first_ok_rra ->
+      let pdp_cnt = first_ok_rra.rra_pdp_cnt in
+      let row_cnt = first_ok_rra.rra_row_cnt in
+      let ok_rras =
+        List.filter
+          (fun rra -> rra.rra_row_cnt = row_cnt && rra.rra_pdp_cnt = pdp_cnt)
+          rras
+      in
+      ok_rras
+  | None ->
+      let rra = List.hd (List.rev rras) in
+      let newstarttime =
+        1L
+        +++ last_pdp_time
+        --- (rrd.timestep *** Int64.of_int (rra.rra_row_cnt * rra.rra_pdp_cnt))
+      in
+      List.filter (contains_time newstarttime) rras
 
 (* now = Unix.gettimeofday () *)
 let query_named_ds rrd now ds_name cf =

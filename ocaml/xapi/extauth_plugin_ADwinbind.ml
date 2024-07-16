@@ -797,12 +797,16 @@ let workgroup_from_server kdc =
     Error (Auth_service_error (E_LOOKUP, err_msg))
 
 let kdc_of_domain domain =
-  try
-    kdcs_of_domain domain
-    (* Does not trust DNS as it may cache some invalid kdcs, CA-360951 *)
-    |> List.find (fun kdc -> workgroup_from_server kdc |> Result.is_ok)
-  with Not_found ->
-    raise (generic_ex "No valid kdc found for domain %s" domain)
+  (* Does not trust DNS as it may cache some invalid kdcs, CA-360951 *)
+  match
+    List.find_opt
+      (fun kdc -> workgroup_from_server kdc |> Result.is_ok)
+      (kdcs_of_domain domain)
+  with
+  | Some x ->
+      x
+  | None ->
+      raise (generic_ex "No valid kdc found for domain %s" domain)
 
 let query_domain_workgroup ~domain =
   let err_msg = Printf.sprintf "Failed to look up domain %s workgroup" domain in

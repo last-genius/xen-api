@@ -44,11 +44,11 @@ let get_valid_device ~__context ~device ~vM ~vGPUs =
   in
   let device_in_use device = List.mem device all_existing_devices in
   if d = 0 then
-    try
-      List.find (fun d -> not (device_in_use d)) all_valid_devices
-      |> string_of_int
-    with Not_found ->
-      raise Api_errors.(Server_error (vm_pci_bus_full, [Ref.string_of vM]))
+    match List.find_opt (fun d -> not (device_in_use d)) all_valid_devices with
+    | Some x ->
+        string_of_int x
+    | None ->
+        raise Api_errors.(Server_error (vm_pci_bus_full, [Ref.string_of vM]))
   else if device_in_use d then
     raise Api_errors.(Server_error (device_already_exists, [device]))
   else if d >= min_valid_vgpu_device && d <= max_valid_vgpu_device then
