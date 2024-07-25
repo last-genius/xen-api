@@ -5248,6 +5248,47 @@ let repository_record rpc session_id repository =
       ]
   }
 
+let hostdriver rpc session_id hostdriver =
+  let _ref = ref hostdriver in
+  let empty =
+    ToGet (fun () -> Client.HostDriver.get_record ~rpc ~session_id ~self:!_ref)
+  in
+  let record = ref empty in
+  let x () = lzy_get record in
+  {
+    setref=
+      (fun r ->
+        _ref := r ;
+        record := empty
+      )
+  ; setrefrec=
+      (fun (a, b) ->
+        _ref := a ;
+        record := Got b
+      )
+  ; record= x
+  ; getref= (fun () -> !_ref)
+  ; fields=
+      [
+        make_field ~name:"uuid" ~get:(fun () -> (x ()).API.hostDriver_uuid) ()
+      ; make_field ~name:"name" ~get:(fun () -> (x ()).API.hostDriver_name) ()
+      ; make_field ~name:"host-uuid"
+          ~get:(fun () ->
+            try get_uuid_from_ref (x ()).API.hostDriver_host with _ -> nid
+          )
+          ()
+      ; make_field ~name:"versions"
+          ~get:(fun () -> concat_with_semi (x ()).API.hostDriver_versions)
+          ()
+      ; make_field ~name:"active-version"
+          ~get:(fun () -> (x ()).API.hostDriver_active_version)
+          ()
+      ; make_field ~name:"selected-version"
+          ~get:(fun () -> (x ()).API.hostDriver_selected_version)
+          ()
+      ]
+  }
+
 let vtpm_record rpc session_id vtpm =
   let _ref = ref vtpm in
   let empty_record =

@@ -6554,6 +6554,40 @@ functor
 
     module Certificate = struct end
 
+    module HostDriver = struct
+      (** [create] creates a database object; this can be done on the
+          coordinator *)
+      let create ~__context ~host ~name ~versions ~active_version
+          ~selected_version =
+        info "%s" __FUNCTION__ ;
+        Xapi_hostdriver.create ~__context ~host ~name ~versions ~active_version
+          ~selected_version
+
+      (** this destroys the database object; this can be done on the
+          coordinator *)
+      let destroy ~__context ~self =
+        info "%s" __FUNCTION__ ;
+        Xapi_hostdriver.destroy ~__context ~self
+
+      (** select needs to be executed on the host of the driver *)
+      let select ~__context ~self ~version =
+        info "%s" __FUNCTION__ ;
+        let host = Db.HostDriver.get_host ~__context ~self in
+        let local_fn = Local.HostDriver.select ~self ~version in
+        do_op_on ~__context ~local_fn ~host (fun session_id rpc ->
+            Client.HostDriver.select ~rpc ~self ~version
+        )
+
+      (** deselect needs to be executed on the host of the driver *)
+      let deselect ~__context ~self =
+        info "%s" __FUNCTION__ ;
+        let host = Db.HostDriver.get_host ~__context ~self in
+        let local_fn = Local.HostDriver.deselect ~self in
+        do_op_on ~__context ~local_fn ~host (fun session_id rpc ->
+            Client.HostDriver.deselect ~rpc ~self
+        )
+    end
+
     module Repository = struct
       let introduce ~__context ~name_label ~name_description ~binary_url
           ~source_url ~update ~gpgkey_path =

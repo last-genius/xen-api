@@ -348,6 +348,10 @@ let update_env __context sync_keys =
           ~value:current_bios_strings
       )
   ) ;
+  switched_sync Xapi_globs.sync_hostdriver (fun () ->
+      debug "%s" __FUNCTION__ ;
+      Xapi_hostdriver.discover ~__context
+  ) ;
 
   (* CA-35549: In a pool rolling upgrade, the master will detect the end of upgrade when the software versions
      	 of all the hosts are the same. It will then assume that (for example) per-host patch records have

@@ -7867,6 +7867,7 @@ let all_system =
   ; Datamodel_repository.t
   ; Datamodel_observer.t
   ; Datamodel_vm_group.t
+  ; Datamodel_hostdriver.t
   ]
 
 (* If the relation is one-to-many, the "many" nodes (one edge each) must come before the "one" node (many edges) *)
@@ -8103,6 +8104,7 @@ let expose_get_all_messages_for =
   ; _repository
   ; _vtpm
   ; _observer
+  ; _hostdriver
   ]
 
 let no_task_id_for = [_task; (* _alert; *) _event]

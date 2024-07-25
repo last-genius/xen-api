@@ -370,6 +370,8 @@ let sync_pci_devices = "sync_pci_devices"
 
 let sync_gpus = "sync_gpus"
 
+let sync_hostdriver = "sync_hostdriver"
+
 (* Allow dbsync actions to be disabled via the redo log, since the database
    isn't of much use if xapi won't start. *)
 let disable_dbsync_for = ref []

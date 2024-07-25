@@ -1,4 +1,6 @@
 let prototyped_of_class = function
+  | "HostDriver" ->
+      Some "24.20.0-next"
   | "VM_group" ->
       Some "24.19.1"
   | "Observer" ->
@@ -107,6 +109,10 @@ let prototyped_of_field = function
       None
 
 let prototyped_of_message = function
+  | "HostDriver", "deselect" ->
+      Some "24.20.0-next"
+  | "HostDriver", "select" ->
+      Some "24.20.0-next"
   | "Observer", "set_components" ->
       Some "23.14.0"
   | "Observer", "set_endpoints" ->
