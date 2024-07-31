@@ -147,11 +147,21 @@ let set_description ~__context value =
   let@ self = operate_on_db_task ~__context in
   Db_actions.DB_Action.Task.set_name_description ~__context ~self ~value
 
+let config_m = Mutex.create ()
+
 let add_to_other_config ~__context key value =
   let@ __context = Context.with_tracing ~__context __FUNCTION__ in
   let@ self = operate_on_db_task ~__context in
-  Db_actions.DB_Action.Task.remove_from_other_config ~__context ~self ~key ;
-  Db_actions.DB_Action.Task.add_to_other_config ~__context ~self ~key ~value
+  let add_with_lock ~__context () =
+    let@ __context = Context.with_tracing ~__context "add_with_lock" in
+    with_lock config_m (fun () ->
+        D.warn "AAAAAA??????" ;
+        Db_actions.DB_Action.Task.remove_from_other_config ~__context ~self ~key ;
+        Db_actions.DB_Action.Task.add_to_other_config ~__context ~self ~key
+          ~value
+    )
+  in
+  add_with_lock ~__context ()
 
 let set_progress ~__context value =
   let@ __context = Context.with_tracing ~__context __FUNCTION__ in
