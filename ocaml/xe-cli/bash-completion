@@ -499,6 +499,20 @@ _xe()
                 return 0
                 ;;
 
+            *-vendor-device | *allow-* | *enabled | *disabled | is-* | \
+              ha-always-run | wlb-verify-cert | https-only | ssl-legacy | \
+              migration-compression | coordinator-bias | multipathing | \
+              bootable | unpluggable | shared)
+                # Until autocompletion can be generated from the
+                # datamodel, this is just naive hardcoding. These cases were
+                # obtained by looking for settable boolean fields:
+                # 'xapi-cli-server/records.ml | grep bool_of_string'
+                __xe_debug "triggering autocompletion for boolean params"
+                IFS=$'\n,'
+                set_completions 'true,false' "$value"
+                return 0
+                ;;
+
             *)
                 snd=`echo ${param} | gawk -F- '{print $NF}'`
                 fst=`echo ${param} | gawk -F- '{printf "%s", $1; for (i=2; i<NF; i++) printf "-%s", $i}'`
