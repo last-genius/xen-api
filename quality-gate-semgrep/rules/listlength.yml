@@ -1,0 +1,69 @@
+id: listlength
+language: ocaml
+severity: error
+rule:
+  kind: infix_expression
+  all:
+  - has:
+      kind: application_expression
+      all:
+      - has:
+          kind: value_path
+          nthChild: 1
+          has:
+            kind: value_name
+            regex: length
+      - has:
+          kind: value_path
+          nthChild: 2
+          has:
+            kind: value_name
+            pattern: $VAR_NAME
+  - has:
+      kind: rel_operator
+      regex: '='
+  - has:
+      kind: number
+      regex: '0'
+  - any:
+    - has:
+        kind: module_path
+        regex: List
+        stopBy: end
+    - has:
+        matches: is-renamed
+        stopBy: end
+    - inside:
+        has:
+          any:
+          - kind: open_module
+            has:
+              kind: module_path
+              regex: List
+          - kind: local_open_expression
+            has:
+              kind: module_path
+              regex: List
+          - matches: is-renamed
+        stopBy: end
+fix: $VAR_NAME = []
+utils:
+  is-renamed:
+    all:
+    - kind: module_path
+      pattern: $MODNAME
+    - inside:
+        has:
+          kind: module_definition
+          has:
+            kind: module_binding
+            all:
+            - has:
+                kind: module_name
+                pattern: $MODNAME
+            - has:
+                kind: module_path
+                has:
+                  kind: module_name
+                  regex: List
+        stopBy: end

@@ -1,0 +1,11 @@
+customLanguages:
+  ocaml:
+      libraryPath: ../ocaml.so
+      extensions: [mli, ml]
+      expandoChar: _
+ruleDirs:
+- ./rules
+testConfigs:
+- testDir: ./tests
+#utilDirs:
+#- ./utils

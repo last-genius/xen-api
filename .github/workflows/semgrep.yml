@@ -1,0 +1,44 @@
+name: semgrep Quality Gate
+
+on: [push]
+
+env:
+  TREE_SITTER_LIBDIR: dynlib
+
+jobs:
+  sg-lint:
+    runs-on: ubuntu-latest
+    name: Run ast-grep lint
+    steps:
+      - name: Install Treesitter
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: tree-sitter-cli
+
+      - name: Checkout OCaml treesitter grammar
+        uses: actions/checkout@v4
+        with:
+          path: 'tree-sitter-ocaml'
+          repository: 'tree-sitter/tree-sitter-ocaml'
+
+      - name: Build OCaml grammar for treesitter
+        run: cd tree-sitter-ocaml && tree-sitter test
+
+      - name: Checkout xapi
+        uses: actions/checkout@v4
+        with:
+          path: 'xen-api'
+
+      - name: cp
+        run: cp tree-sitter-ocaml/dynlib/ocaml.so xen-api/
+
+      - name: Install ast-grep
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: ast-grep
+
+      # Running ast-grep ourselves instead of using their action because
+      # we do not want '--format github' which does not actually print
+      # anything useful.
+      - name: ast-grep lint step
+        run: ast-grep scan -c xen-api/quality-gate-semgrep/sgconfig.yml xen-api/ocaml xen-api/quality-gate-semgrep/test.ml --color always
