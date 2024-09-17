@@ -175,6 +175,8 @@ let prototyped_of_message = function
       Some "23.18.0"
   | "host", "set_https_only" ->
       Some "22.27.0"
+  | "host", "rescan_drivers" ->
+      Some "24.33.0-next"
   | "host", "set_numa_affinity_policy" ->
       Some "24.0.0"
   | "VM", "get_secureboot_readiness" ->
