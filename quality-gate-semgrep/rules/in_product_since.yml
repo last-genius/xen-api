@@ -1,0 +1,67 @@
+id: in_product_since
+language: ocaml
+severity: error
+rule:
+  kind: labeled_argument
+  all:
+  #- has:
+      #kind: value_path
+      #nthChild: 1
+      #has:
+        #kind: value_name
+        #regex: field|call|create_obj
+  - has:
+      kind: label_name
+      regex: in_product_since
+  - has:
+      kind: value_path
+      pattern: $VAR_NAME
+  - inside:
+      has:
+        kind: labeled_argument
+        regex: "~doc:"
+        has:
+          kind: string
+          pattern: $DESC
+  - any:
+    - has:
+        kind: module_path
+        regex: Datamodel_common
+        stopBy: end
+    - has:
+        matches: is-renamed
+        stopBy: end
+    - inside:
+        has:
+          any:
+          - kind: open_module
+            has:
+              kind: module_path
+              regex: Datamodel_common
+          - kind: local_open_expression
+            has:
+              kind: module_path
+              regex: Datamodel_common
+          - matches: is-renamed
+        stopBy: end
+fix: ~lifecycle:[(Published, $VAR_NAME, $DESC)]
+utils:
+  is-renamed:
+    all:
+    - kind: module_path
+      pattern: $MODNAME
+    - inside:
+        has:
+          kind: module_definition
+          has:
+            kind: module_binding
+            all:
+            - has:
+                kind: module_name
+                pattern: $MODNAME
+            - has:
+                kind: module_path
+                has:
+                  kind: module_name
+                  regex: Datamodel_common
+        stopBy: end
