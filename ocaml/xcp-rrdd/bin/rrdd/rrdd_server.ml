@@ -763,7 +763,7 @@ module Plugin = struct
         )
 
       (* Read, parse, and combine metrics from all registered plugins. *)
-      let read_stats () : (Rrd.ds_owner * (float * Ds.ds)) Seq.t =
+      let read_stats () : (Rrd.ds_owner * (float * Ds.ds)) Seq.t Seq.t =
         let plugins =
           with_lock registered_m (fun _ ->
               List.of_seq (Hashtbl.to_seq registered)
@@ -781,7 +781,7 @@ module Plugin = struct
         plugins
         |> List.to_seq
         |> Seq.filter (Fun.negate skip)
-        |> Seq.flat_map process_plugin
+        |> Seq.map process_plugin
     end
 
   module Local = Make (struct
@@ -807,7 +807,7 @@ module Plugin = struct
   let deregister = Local.deregister
 
   (* Read, parse, and combine metrics from all registered plugins. *)
-  let read_stats () : (Rrd.ds_owner * (float * Ds.ds)) Seq.t =
+  let read_stats () : (Rrd.ds_owner * (float * Ds.ds)) Seq.t Seq.t =
     Local.read_stats ()
 end
 

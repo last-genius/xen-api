@@ -517,7 +517,7 @@ let do_monitor_write xc writers =
       let dom0_stats =
         tagged_dom0_stats
         |> List.to_seq
-        |> Seq.flat_map (fun l ->
+        |> Seq.map (fun l ->
                snd l |> fun (timestamp, dss) ->
                List.to_seq dss
                |> Seq.map (fun (owner, ds) -> (owner, (timestamp, ds)))
@@ -527,7 +527,7 @@ let do_monitor_write xc writers =
       let stats = Seq.append plugins_stats dom0_stats in
       Rrdd_stats.print_snapshot () ;
       let uuid_domids = List.map (fun (_, u, i) -> (u, i)) domains in
-      Rrdd_monitor.update_rrds stats uuid_domids my_paused_vms ;
+      Seq.iter (Rrdd_monitor.update_rrds uuid_domids my_paused_vms) stats ;
 
       Rrdd_libs.Constants.datasource_dump_file
       |> Rrdd_server.dump_host_dss_to_file ;

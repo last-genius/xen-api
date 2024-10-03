@@ -98,7 +98,7 @@ let owner_to_string () = function
     update, we assume that the domain has gone and we stream the RRD to the
     master. We also have a list of the currently rebooting VMs to ensure we
     don't accidentally archive the RRD. *)
-let update_rrds dss uuid_domids paused_vms =
+let update_rrds uuid_domids paused_vms dss =
   let uuid_domids = List.to_seq uuid_domids |> StringMap.of_seq in
   let paused_vms = List.to_seq paused_vms |> StringSet.of_seq in
   let consolidate all ((owner, (_timestamp, ds)) as v) =

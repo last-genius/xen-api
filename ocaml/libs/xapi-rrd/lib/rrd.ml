@@ -356,6 +356,10 @@ let process_ds_value ds value interval new_domid =
 
 let ds_update rrd timestamps values transforms new_domid =
   (* Interval is the time between this and the last update *)
+  (* Currently ds_update is called for all datasources of a certain plugin,
+     which all have the same timestamp, so this is safe.
+     Further refactoring is needed if timestamps per measurement are to be
+     introduced. *)
   let timestamp = timestamps.(0) in
   let interval = timestamp -. rrd.last_updated in
   (* Work around the clock going backwards *)
