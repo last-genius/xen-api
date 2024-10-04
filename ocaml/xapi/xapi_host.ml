@@ -1055,7 +1055,9 @@ let create ~__context ~uuid ~name_label ~name_description:_ ~hostname ~address
     ~multipathing:false ~uefi_certificates:"" ~editions:[] ~pending_guidances:[]
     ~tls_verification_enabled ~last_software_update ~recommended_guidances:[]
     ~latest_synced_updates_applied:`unknown ~pending_guidances_recommended:[]
-    ~pending_guidances_full:[] ~last_update_hash:"" ;
+    ~pending_guidances_full:[] ~last_update_hash:""
+    ~available_ssh_ciphersuites:Constants.good_ciphersuites
+    ~available_tls_ciphersuites:Constants.good_ciphersuites ;
   (* If the host we're creating is us, make sure its set to live *)
   Db.Host_metrics.set_last_updated ~__context ~self:metrics ~value:(Date.now ()) ;
   Db.Host_metrics.set_live ~__context ~self:metrics ~value:host_is_us ;

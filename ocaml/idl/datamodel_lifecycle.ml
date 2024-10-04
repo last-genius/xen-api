@@ -51,6 +51,14 @@ let prototyped_of_field = function
       Some "22.26.0"
   | "VTPM", "persistence_backend" ->
       Some "22.26.0"
+  | "host", "available_tls_ciphersuites" ->
+      Some "24.31.0-next"
+  | "host", "enabled_tls_ciphersuites" ->
+      Some "24.31.0-next"
+  | "host", "available_ssh_ciphersuites" ->
+      Some "24.31.0-next"
+  | "host", "enabled_ssh_ciphersuites" ->
+      Some "24.31.0-next"
   | "host", "last_update_hash" ->
       Some "24.10.0"
   | "host", "pending_guidances_full" ->
@@ -96,11 +104,11 @@ let prototyped_of_field = function
   | "pool", "telemetry_uuid" ->
       Some "23.9.0"
   | "pool", "ext_auth_cache_expiry" ->
-      Some "24.30.0-next"
+      Some "24.31.0"
   | "pool", "ext_auth_cache_size" ->
-      Some "24.30.0-next"
+      Some "24.31.0"
   | "pool", "ext_auth_cache_enabled" ->
-      Some "24.30.0-next"
+      Some "24.31.0"
   | "pool", "ext_auth_max_threads" ->
       Some "23.27.0"
   | "pool", "local_auth_max_threads" ->
@@ -170,11 +178,11 @@ let prototyped_of_message = function
   | "pool", "get_guest_secureboot_readiness" ->
       Some "24.17.0"
   | "pool", "set_ext_auth_cache_expiry" ->
-      Some "24.30.0-next"
+      Some "24.31.0"
   | "pool", "set_ext_auth_cache_size" ->
-      Some "24.30.0-next"
+      Some "24.31.0"
   | "pool", "set_ext_auth_cache_enabled" ->
-      Some "24.30.0-next"
+      Some "24.31.0"
   | "pool", "set_ext_auth_max_threads" ->
       Some "23.27.0"
   | "pool", "set_local_auth_max_threads" ->

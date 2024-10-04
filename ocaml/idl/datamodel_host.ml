@@ -2894,6 +2894,17 @@ let t =
             ~default_value:(Some (VString "")) "last_update_hash"
             "The SHA256 checksum of updateinfo of the most recently applied \
              update on the host"
+        ; field ~qualifier:DynamicRO ~lifecycle:[] ~ty:(Set String)
+            "enabled_ssh_ciphersuites" "Enabled SSH ciphersuites"
+        ; field ~qualifier:StaticRO ~lifecycle:[] ~ty:(Set String)
+            ~default_value:(Some (VSet [])) "available_ssh_ciphersuites"
+            "Available SSH ciphersuites"
+        ; field ~qualifier:DynamicRO ~lifecycle:[] ~ty:(Set String)
+            ~default_value:(Some (VSet [])) "enabled_tls_ciphersuites"
+            "Enabled TLS ciphersuites"
+        ; field ~qualifier:StaticRO ~lifecycle:[] ~ty:(Set String)
+            ~default_value:(Some (VSet [])) "available_tls_ciphersuites"
+            "Available TLS ciphersuites"
         ]
       )
     ()

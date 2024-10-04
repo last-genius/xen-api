@@ -81,10 +81,16 @@ let handle_connection fd tls_role =
 (* TODO use the version from nbd repository *)
 let init_tls_get_server_ctx ~certfile =
   let certfile = require_str "certfile" certfile in
+let get_enabled_ciphersuites rpc session_id =
+            Xen_api.Host.get_available_tls_ciphersuites ~rpc ~session_id
+            ~host:something
+in
+let ciphersuites =  Local_xapi_session.with_session get_enabled_ciphersuites
+in
   Some
     (Nbd_unix.TlsServer
        (Nbd_unix.init_tls_get_ctx ~curve:"secp384r1" ~certfile
-          ~ciphersuites:Constants.good_ciphersuites ()
+          ~ciphersuites
        )
     )
 
