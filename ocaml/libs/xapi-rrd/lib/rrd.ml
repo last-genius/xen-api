@@ -96,6 +96,9 @@ let ds_transform_function_to_string = function
   | Identity ->
       "identity"
 
+let most_recently_last_updated last_updated =
+  StringMap.fold (fun _ ts acc -> max ts acc) last_updated neg_infinity
+
 (** The CDP preparation scratch area.
     The 'value' field should be accumulated in such a way that it always
     contains the value that will eventually be the CDP. This means that
@@ -129,6 +132,11 @@ type ds = {
   ; mutable ds_value: float  (** Current calculated rate of the PDP *)
   ; mutable ds_unknown_sec: float
         (** Number of seconds that are unknown in the current PDP *)
+  ; mutable ds_last_updated: float
+        (** Last time this datasource was updated *)
+        (* This is needed because external users have no way of mapping datasource to
+           the plugin that provided it, which stores the same data in a more concise
+           way *)
 }
 [@@deriving rpc]
 
@@ -166,7 +174,8 @@ type rra = {
 (** The container for the DSs and RRAs. Also specifies the period between pdps *)
 
 and rrd = {
-    mutable last_updated: float  (** Last updated time in seconds *)
+    mutable last_updated: float StringMap.t
+        (** maps uniquely identifying string for a plugin to its last updated time*)
   ; timestep: int64  (** Period between PDPs *)
   ; rrd_dss: ds array
   ; rrd_rras: rra array
@@ -202,6 +211,7 @@ let copy_ds x =
   ; ds_last= x.ds_last
   ; ds_value= x.ds_value
   ; ds_unknown_sec= x.ds_unknown_sec
+  ; ds_last_updated= x.ds_last_updated
   }
 
 let copy_rrd x =
@@ -372,19 +382,26 @@ let process_ds_value ds value interval new_rrd =
     ds.ds_last <- value ;
     rate
 
-let ds_update rrd timestamp valuesandtransforms new_rrd =
+let ds_update rrd uid timestamp valuesandtransforms new_rrd =
   (* Interval is the time between this and the last update
 
      Currently ds_update is called with datasources that belong to a single
      plugin, correspondingly they all have the same timestamp.
      Further refactoring is needed if timestamps per measurement are to be
      introduced. *)
-  let interval = timestamp -. rrd.last_updated in
+  let last_updated =
+    match StringMap.find_opt uid rrd.last_updated with
+    | Some t ->
+        t
+    | None ->
+        0.
+  in
+  let interval = timestamp -. last_updated in
   (* Work around the clock going backwards *)
   let interval = if interval < 0. then 5. else interval in
 
   (* start time (st) and age of the last processed pdp and the currently occupied one *)
-  let proc_pdp_st, _proc_pdp_age = get_times rrd.last_updated rrd.timestep in
+  let proc_pdp_st, _proc_pdp_age = get_times last_updated rrd.timestep in
   let occu_pdp_st, occu_pdp_age = get_times timestamp rrd.timestep in
 
   (* The number of pdps that should result from this update *)
@@ -405,13 +422,14 @@ let ds_update rrd timestamp valuesandtransforms new_rrd =
   in
 
   (* We're now done with the last_updated value, so update it *)
-  rrd.last_updated <- timestamp ;
+  rrd.last_updated <- StringMap.add uid timestamp rrd.last_updated ;
 
   (* Calculate the values we're going to store based on the input data and the type of the DS *)
   let v2s =
     Array.map
       (fun (i, {value; _}) ->
         let v = process_ds_value rrd.rrd_dss.(i) value interval new_rrd in
+        rrd.rrd_dss.(i).ds_last_updated <- timestamp ;
         (i, v)
       )
       valuesandtransforms
@@ -474,7 +492,7 @@ let ds_update rrd timestamp valuesandtransforms new_rrd =
 (** Update the rrd with named values rather than just an ordered array
     Must be called with datasources coming from a single plugin, with
     [timestamp] and [uid] representing it *)
-let ds_update_named rrd ~new_rrd timestamp valuesandtransforms =
+let ds_update_named rrd ~new_rrd uid timestamp valuesandtransforms =
   (* NOTE:
      RRD data is stored in several arrays, with the same index pointing to the
      same datasource's data in different arrays. This dependency is not always
@@ -517,7 +535,7 @@ let ds_update_named rrd ~new_rrd timestamp valuesandtransforms =
       )
       ([||], 0) rrd.rrd_dss
   in
-  ds_update rrd timestamp arr new_rrd
+  ds_update rrd uid timestamp arr new_rrd
 
 (** Get registered DS names *)
 let ds_names rrd = Array.to_list (Array.map (fun ds -> ds.ds_name) rrd.rrd_dss)
@@ -548,12 +566,13 @@ let ds_create name ty ?(min = neg_infinity) ?(max = infinity) ?(mrhb = infinity)
   ; ds_last= init
   ; ds_value= 0.0
   ; ds_unknown_sec= 0.0
+  ; ds_last_updated= 0.0
   }
 
-let rrd_create dss rras timestep timestamp =
+let rrd_create uid dss rras timestep timestamp =
   let rrd =
     {
-      last_updated= 0.0
+      last_updated= StringMap.empty
     ; timestep
     ; rrd_dss= dss
     ; rrd_rras=
@@ -581,7 +600,7 @@ let rrd_create dss rras timestep timestamp =
     Array.mapi (fun i ds -> (i, {value= ds.ds_last; transform= Identity})) dss
   in
   (* Use the standard update routines to initialise everything to correct values *)
-  ds_update rrd timestamp valuesandtransforms true ;
+  ds_update rrd uid timestamp valuesandtransforms true ;
   rrd
 
 (** Add in a new DS into a pre-existing RRD. Preserves data of all the other archives
@@ -647,7 +666,7 @@ let rrd_remove_ds rrd ds_name =
     has the most ancient data, or raise No_RRA_Available if there's
     not archive with the correct CF. Assumes the RRAs are stored in
     increasing time-length *)
-let find_best_rras rrd pdp_interval cf start =
+let find_best_rras rrd pdp_interval cf start ds_index =
   let rras =
     match cf with
     | Some realcf ->
@@ -656,7 +675,9 @@ let find_best_rras rrd pdp_interval cf start =
         Array.to_list rrd.rrd_rras
   in
   if rras = [] then raise No_RRA_Available ;
-  let last_pdp_time, _age = get_times rrd.last_updated rrd.timestep in
+  let last_pdp_time, _age =
+    get_times rrd.rrd_dss.(ds_index).ds_last_updated rrd.timestep
+  in
   let contains_time t rra =
     let lasttime =
       last_pdp_time
@@ -690,7 +711,7 @@ let query_named_ds rrd as_of_time ds_name cf =
   if n = -1 then
     raise (Invalid_data_source ds_name)
   else
-    let rras = find_best_rras rrd 0 (Some cf) (Int64.of_float as_of_time) in
+    let rras = find_best_rras rrd 0 (Some cf) (Int64.of_float as_of_time) n in
     match rras with
     | [] ->
         raise No_RRA_Available
@@ -706,8 +727,23 @@ let from_xml input =
   let read_header i =
     ignore (get_el "version" i) ;
     let step = get_el "step" i in
-    let last_update = get_el "lastupdate" i in
-    (step, last_update)
+    step
+  in
+
+  let read_last_updated i =
+    let read_timestamp i acc =
+      read_block "last_updated"
+        (fun i ->
+          let uid = get_el "uid" i in
+          let timestamp = float_of_string (get_el "timestamp" i) in
+          StringMap.add uid timestamp acc
+        )
+        i
+    in
+    let last_updated =
+      read_all_map "last_updated" read_timestamp i StringMap.empty
+    in
+    last_updated
   in
 
   let read_dss i =
@@ -722,6 +758,7 @@ let from_xml input =
           ignore (get_el "last_ds" i) ;
           let value = get_el "value" i in
           let unknown_sec = get_el "unknown_sec" i in
+          let last_updated = get_el "last_updated" i in
           {
             ds_name= name
           ; ds_ty=
@@ -742,11 +779,12 @@ let from_xml input =
           ; (* float_of_string "last_ds"; *)
             ds_value= float_of_string value
           ; ds_unknown_sec= float_of_string unknown_sec
+          ; ds_last_updated= float_of_string last_updated
           }
         )
         i
     in
-    let dss = read_all "ds" read_ds i [] in
+    let dss = Array.of_list (read_all "ds" read_ds i []) in
     dss
   in
 
@@ -791,7 +829,7 @@ let from_xml input =
         let cols = try Array.length data.(0) with _ -> -1 in
         let db =
           Array.init cols (fun i ->
-              let ds = List.nth dss i in
+              let ds = dss.(i) in
               Fring.make rows nan ds.ds_min ds.ds_max
           )
         in
@@ -843,14 +881,15 @@ let from_xml input =
   accept (`Dtd None) input ;
   read_block "rrd"
     (fun i ->
-      let step, last_update = read_header i in
+      let step = read_header i in
+      let last_updated = read_last_updated i in
       let dss = read_dss i in
       let rras = read_rras dss i in
       let rrd =
         {
-          last_updated= float_of_string last_update
+          last_updated
         ; timestep= Int64.of_string step
-        ; rrd_dss= Array.of_list dss
+        ; rrd_dss= dss
         ; rrd_rras= Array.of_list rras
         }
       in
@@ -906,9 +945,24 @@ let xml_to_output rrd output =
         tag "value" (data (Utils.f_to_s ds.ds_value)) output ;
         tag "unknown_sec"
           (data (Printf.sprintf "%d" (int_of_float ds.ds_unknown_sec)))
-          output
+          output ;
+        tag "last_updated" (data (Utils.f_to_s ds.ds_last_updated)) output
       )
       output
+  in
+
+  let do_timestamp output uid ts =
+    tag "last_updated"
+      (fun output ->
+        tag "uid" (data uid) output ;
+        (*tag "timestamp" (data (Utils.f_to_s ts)) output*)
+        tag "timestamp" (data Int64.(to_string (of_float ts))) output
+      )
+      output
+  in
+
+  let do_last_updated last_updated output =
+    StringMap.iter (do_timestamp output) last_updated
   in
 
   let do_dss dss output = Array.iter (fun ds -> do_ds ds output) dss in
@@ -968,9 +1022,7 @@ let xml_to_output rrd output =
     (fun output ->
       tag "version" (data "0003") output ;
       tag "step" (data (Int64.to_string rrd.timestep)) output ;
-      tag "lastupdate"
-        (data (Printf.sprintf "%Ld" (Int64.of_float rrd.last_updated)))
-        output ;
+      do_last_updated rrd.last_updated output ;
       do_dss rrd.rrd_dss output ;
       do_rras rrd.rrd_rras output
     )
@@ -991,6 +1043,8 @@ module Json = struct
 
   let array xs = `List xs
 
+  let last_updated (uid, ts) = (uid, float ts)
+
   let datasource ds =
     record
       [
@@ -1002,6 +1056,7 @@ module Json = struct
       ; ("last_ds", string (ds_value_to_string ds.ds_last))
       ; ("value", float ds.ds_value)
       ; ("unknown_sec", float ds.ds_unknown_sec)
+      ; ("last_updated", float ds.ds_last_updated)
       ]
 
   let cdp x =
@@ -1046,7 +1101,9 @@ module Json = struct
       [
         ("version", string "0003")
       ; ("step", int64 x.timestep)
-      ; ("lastupdate", float x.last_updated)
+      ; ( "last_updated"
+        , record @@ List.map last_updated @@ StringMap.bindings x.last_updated
+        )
       ; ("ds", array @@ List.map datasource @@ Array.to_list x.rrd_dss)
       ; ("rra", array @@ List.map rra @@ Array.to_list x.rrd_rras)
       ]

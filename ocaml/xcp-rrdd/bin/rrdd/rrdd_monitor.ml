@@ -26,7 +26,7 @@ let create_rras use_min_max =
 let step = 5L
 
 (** Create a rrd *)
-let create_fresh_rrd use_min_max dss timestamp =
+let create_fresh_rrd use_min_max dss uid timestamp =
   let rras = create_rras use_min_max in
   let dss =
     Array.of_list
@@ -43,7 +43,7 @@ let create_fresh_rrd use_min_max dss timestamp =
          dss
       )
   in
-  Rrd.rrd_create dss rras step timestamp
+  Rrd.rrd_create uid dss rras step timestamp
 
 (* Check if new (enabled) datasources appeared, and add them to the RRD *)
 let merge_new_dss rrdi dss =
@@ -96,7 +96,7 @@ end)
     update, we assume that the domain has gone and we stream the RRD to the
     master. We also have a list of the currently rebooting VMs to ensure we
     don't accidentally archive the RRD. *)
-let update_rrds uuid_domids paused_vms (timestamp, dss) =
+let update_rrds uuid_domids paused_vms (uid, timestamp, dss) =
   let uuid_domids = List.to_seq uuid_domids |> StringMap.of_seq in
   let paused_vms = List.to_seq paused_vms |> StringSet.of_seq in
   let consolidate all (owner, ds) =
@@ -127,8 +127,11 @@ let update_rrds uuid_domids paused_vms (timestamp, dss) =
         | None ->
             (false, 0.)
         | Some rrdi ->
-            ( rrdi.rrd.Rrd.last_updated > reading_timestamp
-            , abs_float (reading_timestamp -. rrdi.rrd.Rrd.last_updated)
+            let last_updated =
+              Rrd.most_recently_last_updated rrdi.rrd.last_updated
+            in
+            ( last_updated > reading_timestamp
+            , abs_float (reading_timestamp -. last_updated)
             )
       in
       if out_of_date then
@@ -150,12 +153,12 @@ let update_rrds uuid_domids paused_vms (timestamp, dss) =
                  ignore changes from paused domains: *)
               let named_updates = StringMap.map to_named_updates dss in
               if not (StringSet.mem vm_uuid paused_vms) then
-                Rrd.ds_update_named rrd ~new_rrd:(domid <> rrdi.domid) timestamp
-                  named_updates
+                Rrd.ds_update_named rrd ~new_rrd:(domid <> rrdi.domid) uid
+                  timestamp named_updates
           | None ->
               debug "%s: Creating fresh RRD for VM uuid=%s" __FUNCTION__ vm_uuid ;
               let dss_list = map_keys_to_list dss in
-              let rrd = create_fresh_rrd !use_min_max dss_list timestamp in
+              let rrd = create_fresh_rrd !use_min_max dss_list uid timestamp in
               Hashtbl.replace vm_rrds vm_uuid {rrd; dss; domid}
         )
         | None ->
@@ -170,11 +173,11 @@ let update_rrds uuid_domids paused_vms (timestamp, dss) =
               let updated_dss, rrd = merge_new_dss rrdi dss in
               Hashtbl.replace sr_rrds sr_uuid {rrd; dss= updated_dss; domid= 0} ;
               let named_updates = StringMap.map to_named_updates dss in
-              Rrd.ds_update_named rrd ~new_rrd:false timestamp named_updates
+              Rrd.ds_update_named rrd ~new_rrd:false uid timestamp named_updates
           | None ->
               debug "%s: Creating fresh RRD for SR uuid=%s" __FUNCTION__ sr_uuid ;
               let dss_list = map_keys_to_list dss in
-              let rrd = create_fresh_rrd !use_min_max dss_list timestamp in
+              let rrd = create_fresh_rrd !use_min_max dss_list uid timestamp in
               Hashtbl.replace sr_rrds sr_uuid {rrd; dss; domid= 0}
         with _ -> log_backtrace ()
       in
@@ -183,14 +186,14 @@ let update_rrds uuid_domids paused_vms (timestamp, dss) =
         | None ->
             debug "%s: Creating fresh RRD for localhost" __FUNCTION__ ;
             let dss_list = map_keys_to_list dss in
-            let rrd = create_fresh_rrd true dss_list timestamp in
+            let rrd = create_fresh_rrd true dss_list uid timestamp in
             (* Always always create localhost rrds with min/max enabled *)
             host_rrd := Some {rrd; dss; domid= 0}
         | Some rrdi ->
             let updated_dss, rrd = merge_new_dss rrdi dss in
             host_rrd := Some {rrd; dss= updated_dss; domid= 0} ;
             let named_updates = StringMap.map to_named_updates dss in
-            Rrd.ds_update_named rrd ~new_rrd:false timestamp named_updates
+            Rrd.ds_update_named rrd ~new_rrd:false uid timestamp named_updates
       in
 
       let process_dss ds_owner dss =

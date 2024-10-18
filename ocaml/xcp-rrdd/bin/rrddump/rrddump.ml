@@ -16,8 +16,9 @@ let text_export rrd =
   let open Rrd in
   for rra_i = 0 to Array.length rrd.rrd_rras - 1 do
     let rra = rrd.rrd_rras.(rra_i) in
+    let last_updated = Rrd.most_recently_last_updated rrd.last_updated in
     let start =
-      rrd.last_updated
+      last_updated
       -. Int64.to_float
            (Int64.mul
               (Int64.of_int (rra.rra_pdp_cnt * rra.rra_row_cnt))
@@ -27,15 +28,16 @@ let text_export rrd =
     Printf.printf "start=%f\n" start ;
     let rra_timestep = Int64.mul rrd.timestep (Int64.of_int rra.rra_pdp_cnt) in
     (* Get the last and first times of the CDPs to be returned *)
-    let last_cdp_time, _age = get_times rrd.last_updated rra_timestep in
+    let last_cdp_time, _age = get_times last_updated rra_timestep in
     let time i =
       Int64.sub last_cdp_time (Int64.mul (Int64.of_int i) rra_timestep)
     in
     for j = 0 to Array.length rrd.rrd_dss - 1 do
-      Printf.printf "Doing ds: %s\n" rrd.rrd_dss.(j).ds_name ;
+      let ds = rrd.rrd_dss.(j) in
+      Printf.printf "Doing ds: %s\n" ds.ds_name ;
       let oc =
         open_out
-          (Printf.sprintf "rrd_data_%s_%s_%Ld.dat" rrd.rrd_dss.(j).ds_name
+          (Printf.sprintf "rrd_data_%s_%s_%Ld.dat" ds.ds_name
              (cf_type_to_string rra.rra_cf)
              (Int64.mul
                 (Int64.of_int (rra.rra_pdp_cnt * rra.rra_row_cnt))
