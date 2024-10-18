@@ -517,7 +517,9 @@ let do_monitor_write xc writers =
       let dom0_stats =
         tagged_dom0_stats
         |> List.to_seq
-        |> Seq.map (fun (name, (timestamp, dss)) -> (timestamp, List.to_seq dss))
+        |> Seq.map (fun (name, (timestamp, dss)) ->
+               (name, timestamp, List.to_seq dss)
+           )
       in
       let plugins_stats = Rrdd_server.Plugin.read_stats () in
       let stats = Seq.append plugins_stats dom0_stats in

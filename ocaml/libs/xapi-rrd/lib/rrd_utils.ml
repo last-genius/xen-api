@@ -126,6 +126,12 @@ module Xmlm_utils = struct
     ) else
       raise Parse_error
 
+  let rec read_all_map t read_f i acc =
+    if Xmlm.peek i = start_tag t then
+      read_all_map t read_f i (read_f i acc)
+    else
+      acc
+
   let rec read_all t read_f i acc =
     if Xmlm.peek i = start_tag t then
       read_all t read_f i (read_f i :: acc)

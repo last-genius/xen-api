@@ -212,7 +212,8 @@ let create_multi prefixandrrds start interval cfopt =
   let timestep, last_updated =
     match prefixandrrds with
     | (_, r) :: _ ->
-        (r.timestep, r.last_updated)
+        let last_updated = Rrd.most_recently_last_updated r.last_updated in
+        (r.timestep, last_updated)
     | [] ->
         raise No_RRA_Available
   in
@@ -229,7 +230,13 @@ let create_multi prefixandrrds start interval cfopt =
     prefixandrrds
     |> List.map (fun (_, rrd) ->
            if start < 0L then
-             Int64.(add start (of_float rrd.last_updated))
+             StringMap.fold
+               (fun _ v -> min v)
+               (StringMap.map
+                  (fun ts -> Int64.(add start (of_float ts)))
+                  rrd.last_updated
+               )
+               Int64.max_int
            else
              start
        )
@@ -240,7 +247,10 @@ let create_multi prefixandrrds start interval cfopt =
     List.map
       (fun (_prefix, rrd) ->
         (* Find the rrds that satisfy the requirements *)
-        Rrd.find_best_rras rrd pdp_interval cfopt start
+        (* NOTE: 0 is provided as the index of the datasource since we're
+           not looking for any one in particular, and last_updated of all should be
+           roughly the same for our purposes *)
+        Rrd.find_best_rras rrd pdp_interval cfopt start 0
       )
       prefixandrrds
   in
