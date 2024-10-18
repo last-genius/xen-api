@@ -65,12 +65,15 @@ let merge_new_dss rrd dss =
      log of the number of entries at worst, so this should be alright.
      Previous conversions to List are also not tail-recursive with identical
      stack depth *)
-  StringMap.fold
-    (fun _key (timestamp, ds) rrd ->
-      rrd_add_ds rrd timestamp
-        (Rrd.ds_create ds.ds_name ds.Ds.ds_type ~mrhb:300.0 Rrd.VT_Unknown)
-    )
-    new_dss rrd
+  ( enabled_dss_size
+  , enabled_dss
+  , StringMap.fold
+      (fun _key (timestamp, ds) rrd ->
+        rrd_add_ds rrd timestamp
+          (Rrd.ds_create ds.ds_name ds.Ds.ds_type ~mrhb:300.0 Rrd.VT_Unknown)
+      )
+      new_dss rrd
+  )
 
 module OwnerMap = Map.Make (struct
   type t = ds_owner
@@ -108,7 +111,9 @@ let update_rrds uuid_domids paused_vms (timestamp, dss) =
     OwnerMap.update owner merge all
   in
   let dss = Seq.fold_left consolidate OwnerMap.empty dss in
-  let to_named_updates (_, ds) = (ds.ds_value, ds.ds_pdp_transform_function) in
+  let to_named_updates (_, ds) =
+    {value= ds.ds_value; transform= ds.ds_pdp_transform_function}
+  in
   let map_keys_to_list dss =
     StringMap.bindings dss |> List.map snd |> List.map snd
   in
@@ -138,16 +143,16 @@ let update_rrds uuid_domids paused_vms (timestamp, dss) =
           (* First, potentially update the rrd with any new default dss *)
           match Hashtbl.find_opt vm_rrds vm_uuid with
           | Some rrdi ->
-              let rrd = merge_new_dss rrdi.rrd dss in
+              let dss_size, enabled_dss, rrd = merge_new_dss rrdi.rrd dss in
               Hashtbl.replace vm_rrds vm_uuid {rrd; dss; domid} ;
               (* CA-34383: Memory updates from paused domains serve no useful
                  purpose. During a migrate such updates can also cause undesirable
                  discontinuities in the observed value of memory_actual. Hence, we
                  ignore changes from paused domains: *)
-              let named_updates = StringMap.map to_named_updates dss in
+              let named_updates = StringMap.map to_named_updates enabled_dss in
               if not (StringSet.mem vm_uuid paused_vms) then
                 Rrd.ds_update_named rrd ~new_rrd:(domid <> rrdi.domid) timestamp
-                  named_updates
+                  named_updates dss_size
           | None ->
               debug "%s: Creating fresh RRD for VM uuid=%s" __FUNCTION__ vm_uuid ;
               let dss_list = map_keys_to_list dss in
@@ -163,10 +168,11 @@ let update_rrds uuid_domids paused_vms (timestamp, dss) =
           (* First, potentially update the rrd with any new default dss *)
           match Hashtbl.find_opt sr_rrds sr_uuid with
           | Some rrdi ->
-              let rrd = merge_new_dss rrdi.rrd dss in
+              let dss_size, enabled_dss, rrd = merge_new_dss rrdi.rrd dss in
               Hashtbl.replace sr_rrds sr_uuid {rrd; dss; domid= 0} ;
-              let named_updates = StringMap.map to_named_updates dss in
+              let named_updates = StringMap.map to_named_updates enabled_dss in
               Rrd.ds_update_named rrd ~new_rrd:false timestamp named_updates
+                dss_size
           | None ->
               debug "%s: Creating fresh RRD for SR uuid=%s" __FUNCTION__ sr_uuid ;
               let dss_list = map_keys_to_list dss in
@@ -183,10 +189,11 @@ let update_rrds uuid_domids paused_vms (timestamp, dss) =
             (* Always always create localhost rrds with min/max enabled *)
             host_rrd := Some {rrd; dss; domid= 0}
         | Some rrdi ->
-            let rrd = merge_new_dss rrdi.rrd dss in
+            let dss_size, enabled_dss, rrd = merge_new_dss rrdi.rrd dss in
             host_rrd := Some {rrd; dss; domid= 0} ;
-            let named_updates = StringMap.map to_named_updates dss in
+            let named_updates = StringMap.map to_named_updates enabled_dss in
             Rrd.ds_update_named rrd ~new_rrd:false timestamp named_updates
+              dss_size
       in
       let process_dss ds_owner dss =
         match ds_owner with
