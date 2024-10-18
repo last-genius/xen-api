@@ -489,6 +489,11 @@ let ds_update rrd uid timestamp valuesandtransforms new_rrd =
       v2s
   )
 
+(* TODO: I've reversed the order here, which means datasources that have
+   disappeared, but are still in the RRD will not get their values "reset" to
+   VT_Unknown, Identity. This needs to be done somehow at the end when all of
+   the chunks are processed *)
+
 (** Update the rrd with named values rather than just an ordered array
     Must be called with datasources coming from a single plugin, with
     [timestamp] and [uid] representing it *)
