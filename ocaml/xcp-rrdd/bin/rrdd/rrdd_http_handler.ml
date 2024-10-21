@@ -193,6 +193,7 @@ let get_rrd_updates_handler (req : Http.Request.t) (s : Unix.file_descr) _ =
   let reply =
     get_host_stats ~json ~start ~interval ~cfopt ~is_host ~vm_uuid ~sr_uuid ()
   in
+  debug "rrdd_http_handler before headers" ;
   let headers =
     List.concat
       [
@@ -206,7 +207,10 @@ let get_rrd_updates_handler (req : Http.Request.t) (s : Unix.file_descr) _ =
         ]
       ]
   in
+  debug "rrdd_http_handler after headers: [%s]"
+    (Astring.String.concat ~sep:"\n" headers) ;
   Http_svr.headers s headers ;
+  debug "rrdd_http_handler after server" ;
   Unix.write s (Bytes.unsafe_of_string reply) 0 (String.length reply) |> ignore
 
 (* Reads RRD information sent from the client over HTTP through the file
