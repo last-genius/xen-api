@@ -523,8 +523,14 @@ let do_monitor_write xc writers =
       Rrdd_stats.print_snapshot () ;
       let uuid_domids = List.map (fun (_, u, i) -> (u, i)) domains in
 
+      let paused_vms =
+        List.to_seq my_paused_vms |> Rrdd_shared.StringSet.of_seq
+      in
       (* stats are grouped per plugin, which provides its timestamp *)
-      Seq.iter (Rrdd_monitor.update_rrds uuid_domids my_paused_vms) stats ;
+      Seq.iter (Rrdd_monitor.update_rrds uuid_domids paused_vms) stats ;
+
+      (* NOTE: has to happen after updating actually provided datasources *)
+      Rrdd_monitor.handle_missing_stats stats paused_vms ;
 
       Rrdd_libs.Constants.datasource_dump_file
       |> Rrdd_server.dump_host_dss_to_file ;

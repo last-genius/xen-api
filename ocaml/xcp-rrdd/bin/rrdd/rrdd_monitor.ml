@@ -91,16 +91,7 @@ module OwnerMap = Map.Make (struct
         String.compare a b
 end)
 
-(** Updates all of the hosts rrds. We are passed a list of uuids that is used as
-    the primary source for which VMs are resident on us. When a new uuid turns
-    up that we haven't got an RRD for in our hashtbl, we create a new one. When
-    a uuid for which we have an RRD for doesn't appear to have any stats this
-    update, we assume that the domain has gone and we stream the RRD to the
-    master. We also have a list of the currently rebooting VMs to ensure we
-    don't accidentally archive the RRD. *)
-let update_rrds uuid_domids paused_vms (uid, timestamp, dss) =
-  let uuid_domids = List.to_seq uuid_domids |> StringMap.of_seq in
-  let paused_vms = List.to_seq paused_vms |> StringSet.of_seq in
+let convert_to_owner_map timestamp dss =
   let consolidate all (owner, ds) =
     let add_ds_to = StringMap.add ds.ds_name (timestamp, ds) in
     let merge = function
@@ -112,6 +103,94 @@ let update_rrds uuid_domids paused_vms (uid, timestamp, dss) =
     OwnerMap.update owner merge all
   in
   let dss = Seq.fold_left consolidate OwnerMap.empty dss in
+  dss
+
+(** Determine datasources missing from this batch, reset them to default
+    Unknown values *)
+let handle_missing_stats stats paused_vms =
+  let named_update = {value= VT_Unknown; transform= Identity} in
+  let timestamp = Unix.gettimeofday () in
+  let available_stats =
+    Seq.flat_map (fun (_, _, dss) -> dss) stats
+    |> convert_to_owner_map timestamp
+  in
+  (* Check which of the enabled data sources are missing from the update batch *)
+  let which_missing arr dss =
+    Array.fold_left
+      (fun missing (ds : Rrd.ds) ->
+        if StringMap.mem ds.ds_name dss then
+          missing
+        else
+          StringMap.add ds.ds_name named_update missing
+      )
+      StringMap.empty arr
+  in
+
+  (* NOTE: This only handles missing data sources in an RRD that is partly
+     updated, and will not reset the datasources in RRD where all of the
+     datasources have gone missing. This is already handled by VM and SR
+     shutdown code in XAPI, which will remove such RRDs entirely. *)
+  let process_dss ds_owner (dss : (float * Ds.ds) StringMap.t) owner_map =
+    match ds_owner with
+    | Host -> (
+      match !Rrdd_shared.host_rrd with
+      | Some host_rrdi ->
+          OwnerMap.add ds_owner
+            (host_rrdi, which_missing host_rrdi.rrd.rrd_dss dss)
+            owner_map
+      | None ->
+          owner_map
+    )
+    | VM vm_uuid -> (
+      match Hashtbl.find_opt Rrdd_shared.vm_rrds vm_uuid with
+      | Some vm_rrdi ->
+          if StringSet.mem vm_uuid paused_vms then
+            owner_map
+          else
+            OwnerMap.add ds_owner
+              (vm_rrdi, which_missing vm_rrdi.rrd.rrd_dss dss)
+              owner_map
+      | None ->
+          owner_map
+    )
+    | SR sr_uuid -> (
+      match Hashtbl.find_opt Rrdd_shared.sr_rrds sr_uuid with
+      | Some sr_rrdi ->
+          OwnerMap.add ds_owner
+            (sr_rrdi, which_missing sr_rrdi.rrd.rrd_dss dss)
+            owner_map
+      | None ->
+          owner_map
+    )
+  in
+
+  (* NOTE: We are working on already added and enabled datasources that have
+     not been provided a value on this refresh cycle, so nothing needs to be
+     added to RRDs *)
+  let missing_stats =
+    OwnerMap.fold process_dss available_stats OwnerMap.empty
+  in
+  OwnerMap.iter
+    (* NOTE: new_rrd is always false, since it's only 'true' currently if a VM's
+       domid does not correspond to rrdi.domid, which would already have been
+       fixed by replacing rrdi.domid with the current domid when updating with
+       provided datasources *)
+      (fun _ds_owner (rrdi, named_updates) ->
+      Rrd.ds_update_named rrdi.rrd ~new_rrd:false "rrdd-monitor-reset" timestamp
+        named_updates
+    )
+    missing_stats
+
+(** Updates all of the hosts rrds. We are passed a list of uuids that is used as
+    the primary source for which VMs are resident on us. When a new uuid turns
+    up that we haven't got an RRD for in our hashtbl, we create a new one. When
+    a uuid for which we have an RRD for doesn't appear to have any stats this
+    update, we assume that the domain has gone and we stream the RRD to the
+    master. We also have a list of the currently rebooting VMs to ensure we
+    don't accidentally archive the RRD. *)
+let update_rrds uuid_domids paused_vms (uid, timestamp, dss) =
+  let uuid_domids = List.to_seq uuid_domids |> StringMap.of_seq in
+  let dss = convert_to_owner_map timestamp dss in
   let to_named_updates (_, ds) =
     {value= ds.ds_value; transform= ds.ds_pdp_transform_function}
   in
@@ -153,8 +232,8 @@ let update_rrds uuid_domids paused_vms (uid, timestamp, dss) =
                  purpose. During a migrate such updates can also cause undesirable
                  discontinuities in the observed value of memory_actual. Hence, we
                  ignore changes from paused domains: *)
-              let named_updates = StringMap.map to_named_updates dss in
               if not (StringSet.mem vm_uuid paused_vms) then
+                let named_updates = StringMap.map to_named_updates dss in
                 Rrd.ds_update_named rrd ~new_rrd:(domid <> rrdi.domid) uid
                   timestamp named_updates
           | None ->
