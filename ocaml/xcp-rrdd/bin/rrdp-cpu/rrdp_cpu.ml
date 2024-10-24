@@ -190,18 +190,21 @@ let dss_hostload xc domains =
       (fun acc (dom, _, domid) ->
         sum 0 dom.Xenctrl.max_vcpu_id (fun id ->
             let vcpuinfo = Xenctrl.domain_get_vcpuinfo xc domid id in
-            if vcpuinfo.Xenctrl.online && not vcpuinfo.Xenctrl.blocked then
+            if vcpuinfo.Xenctrl.online && not vcpuinfo.Xenctrl.blocked then (
+              D.info "vcpu %d running" id ;
               1
-            else
+            ) else (
+              D.info "vcpu %d offline" id ;
               0
+            )
         )
         + acc
       )
       0 domains
   in
   let running_domains = count_power_state_running_domains domains in
-
   let load_per_cpu = float_of_int load /. float_of_int pcpus in
+  D.info "ncpus is %d and load_per_cpu is %f" pcpus load_per_cpu ;
   [
     ( Rrd.Host
     , Ds.ds_make ~name:"hostload" ~units:"(fraction)"
@@ -227,7 +230,19 @@ let dss_hostload xc domains =
   ]
 
 let generate_cpu_ds_list xc () =
+  D.info "domain_snapshotting" ;
+  let process_line str = D.info "xl: %s" str ; None in
+  let _ =
+    Utils.exec_cmd
+      (module Process.D)
+      ~cmdstring:"/usr/sbin/xl vcpu-list" ~f:process_line
+  in
   let _, domains, _ = Xenctrl_lib.domain_snapshot xc in
+  let _ =
+    Utils.exec_cmd
+      (module Process.D)
+      ~cmdstring:"/usr/sbin/xl vcpu-list" ~f:process_line
+  in
   dss_pcpus xc @ dss_vcpus xc domains @ dss_loadavg () @ dss_hostload xc domains
 
 let _ =
