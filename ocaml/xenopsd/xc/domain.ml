@@ -390,10 +390,11 @@ let make ~xc ~xs vm_info vcpus domain_config uuid final_uuid no_sharept
             let max_per_vif = 8 in
             (* 1 VIF takes up (256 rx entries + 256 tx entries) * 8 queues max
                * 8 bytes per grant table entry / 4096 bytes size of frame *)
-            let reasonable_per_vbd = 1 in
-            (* (1 ring (itself taking up one granted page) + 1 ring *
+            let reasonable_per_vbd = 11 in
+            (* (1 ring (itself taking up 16 granted pages) +
+               1 ring * 16 pages per ring *
                32 requests * 11 grant refs contained in each * 8 bytes ) /
-               4096 bytes size of frame = 0.6875, rounded up *)
+               4096 bytes size of frame = 0.6875 *)
             let frames_number =
               (max_per_vif * (num_of_vifs + 1))
               + (reasonable_per_vbd * (num_of_vbds + 1))
@@ -418,8 +419,8 @@ let make ~xc ~xs vm_info vcpus domain_config uuid final_uuid no_sharept
                  of these frames contains GRANTS_PER_INDIRECT_FRAME grants in
                  turn (stored in blkif_request_segment).
                  In practice, this means a catastrophic explosion - we should
-                 not really aim to detect if indirect requests feature on, but
-                 turn it off to get reasonable estimates.
+                 not really aim to detect if indirect requests feature is on,
+                 but turn it off to get reasonable estimates.
                  1.2) persistent grants - these are an optimization, so
                  shouldn't really change the calculations, worst case is none
                  of the grants are persistent.
@@ -438,8 +439,9 @@ let make ~xc ~xs vm_info vcpus domain_config uuid final_uuid no_sharept
                object itself and (their max bound) known at the time of domain
                creation.
 
-               So for this estimate, there is only 1 ring which is 1 page, with
-               32 entries, each entry (request) can have up to 11 pages
+               So for this estimate, there is only 1 ring which is 16 pages
+               (worst case for GFS2 SRs, due to XENBUS_MAX_RING_GRANT_ORDER=4),
+               with 32 entries, each entry (request) can have up to 11 pages
                (excluding indirect pages and other complications).
 
                SEE: xen-blkfront.c, blkif.h, and the backdriver to understand
