@@ -23,6 +23,7 @@ install:
 	$(IDATA) dnf_plugins/accesstoken.py $(DESTDIR)$(SITE3_DIR)/$(DNF_PLUGIN_DIR)/
 	$(IDATA) dnf_plugins/ptoken.py $(DESTDIR)$(SITE3_DIR)/$(DNF_PLUGIN_DIR)/
 
+	$(IPROG) libexec/metricsgraph.py $(DESTDIR)$(LIBEXECDIR)
 	$(IPROG) libexec/host-display $(DESTDIR)$(LIBEXECDIR)
 	$(IPROG) libexec/link-vms-by-sr.py $(DESTDIR)$(LIBEXECDIR)
 	$(IPROG) libexec/usb_reset.py $(DESTDIR)$(LIBEXECDIR)
