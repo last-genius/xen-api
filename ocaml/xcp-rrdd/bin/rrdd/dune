@@ -12,6 +12,8 @@
     inotify
     mtime
     mtime.clock.os
+    opentelemetry
+    opentelemetry-client-plaintext
     rpclib.core
     rrd-transport
     rrd-transport.lib

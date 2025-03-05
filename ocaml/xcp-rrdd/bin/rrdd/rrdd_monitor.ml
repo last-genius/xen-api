@@ -4,6 +4,7 @@ open Ds
 
 module D = Debug.Make (struct let name = "rrdd_monitor" end)
 
+module Otel = Opentelemetry
 open D
 
 let create_rras use_min_max =
@@ -135,6 +136,60 @@ let convert_to_owner_map dss =
     Seq.fold_left consolidate (OwnerMap.empty, OwnerMap.empty) dss
   in
   (per_owner_map, per_plugin_map)
+
+let update_otel_metrics (dss : (string * float * (ds_owner * Ds.ds) Seq.t) Seq.t)
+    =
+  let open Otel.Metrics in
+  let ( let* ) = Option.bind in
+  let lst =
+    Seq.fold_left
+      (fun lst (owner, timestamp, dss) ->
+        List.append lst
+          (Seq.filter_map
+             (fun (_, ds) ->
+               let* value =
+                 match ds.Ds.ds_value with
+                 | VT_Float x ->
+                     Some (float x)
+                 | VT_Int64 x ->
+                     Some (int (Int64.to_int x))
+                 | _ ->
+                     None
+               in
+               match ds.Ds.ds_type with
+               | Absolute ->
+                   Some
+                     (gauge ~name:ds.Ds.ds_name
+                        ~description:ds.Ds.ds_description ~unit_:ds.Ds.ds_units
+                        [value]
+                     )
+               | Gauge ->
+                   Some
+                     (gauge ~name:ds.Ds.ds_name
+                        ~description:ds.Ds.ds_description ~unit_:ds.Ds.ds_units
+                        [value]
+                     )
+               | Derive ->
+                   Some
+                     (gauge ~name:ds.Ds.ds_name
+                        ~description:ds.Ds.ds_description ~unit_:ds.Ds.ds_units
+                        [value]
+                     )
+               (* also sum and histogram *)
+               (*; [ds_owner owner]*)
+               (*; ds_transform ds.Ds.ds_pdp_transform_function*)
+               (*("default", bool ds.Ds.ds_default)*)
+               (*; ("min", float ds.Ds.ds_min)*)
+               (*; ("max", float ds.Ds.ds_max)*)
+             )
+             dss
+          |> List.of_seq
+          )
+      )
+      [] dss
+  in
+  let resource_metrics = make_resource_metrics lst in
+  warn "%s" (Opentelemetry_client_plaintext.dump_metrics [resource_metrics])
 
 (** Updates all of the hosts rrds. We are passed a list of uuids that is used as
     the primary source for which VMs are resident on us. When a new uuid turns

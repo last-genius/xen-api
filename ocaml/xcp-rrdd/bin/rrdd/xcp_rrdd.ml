@@ -523,6 +523,7 @@ let do_monitor_write xc writers =
       let uuid_domids = List.map (fun (_, u, i) -> (u, i)) domains in
 
       (* stats are grouped per plugin, which provides its timestamp *)
+      Rrdd_monitor.update_otel_metrics stats ;
       Rrdd_monitor.update_rrds uuid_domids my_paused_vms stats ;
 
       Rrdd_libs.Constants.datasource_dump_file
