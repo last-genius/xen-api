@@ -16,6 +16,10 @@ let mime_xml = "text/xml"
 
 let content_xml = content_hdr_of_mime mime_xml
 
+let plaintext = "text/plain"
+
+let content_plaintext = content_hdr_of_mime plaintext
+
 let client_prefers_json req =
   let module Accept = Http.Accept in
   let ( let* ) = Option.bind in
@@ -207,6 +211,28 @@ let get_rrd_updates_handler (req : Http.Request.t) (s : Unix.file_descr) _ =
   in
   Http_svr.headers s headers ;
   Unix.write s (Bytes.unsafe_of_string reply) 0 (String.length reply) |> ignore
+
+let get_otel_metrics_handler (req : Http.Request.t) (s : Unix.file_descr) _ =
+  let metrics =
+    match !Rrdd_shared.otel_metrics with Some x -> [x] | None -> []
+  in
+  let contents = Opentelemetry_client_plaintext.dump_metrics metrics in
+  let headers =
+    List.concat
+      [
+        Http.http_200_ok_with_content
+          (Int64.of_int (String.length contents))
+          ~version:"1.1" ~keep_alive:true ()
+      ; [
+          content_plaintext
+        ; "Access-Control-Allow-Origin: *"
+        ; "Access-Control-Allow-Headers: X-Requested-With"
+        ]
+      ]
+  in
+  Http_svr.headers s headers ;
+  Unix.write s (Bytes.unsafe_of_string contents) 0 (String.length contents)
+  |> ignore
 
 (* Reads RRD information sent from the client over HTTP through the file
    descriptor. The handler either archives the data, or updates the relevant

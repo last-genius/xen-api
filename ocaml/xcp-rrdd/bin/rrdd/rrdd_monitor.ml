@@ -189,7 +189,9 @@ let update_otel_metrics (dss : (string * float * (ds_owner * Ds.ds) Seq.t) Seq.t
       [] dss
   in
   let resource_metrics = make_resource_metrics lst in
-  warn "%s" (Opentelemetry_client_plaintext.dump_metrics [resource_metrics])
+  warn "%s" (Opentelemetry_client_plaintext.dump_metrics [resource_metrics]) ;
+  (* DEBUG *)
+  Rrdd_shared.otel_metrics := Some resource_metrics
 
 (** Updates all of the hosts rrds. We are passed a list of uuids that is used as
     the primary source for which VMs are resident on us. When a new uuid turns

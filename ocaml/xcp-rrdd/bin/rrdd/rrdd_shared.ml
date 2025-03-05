@@ -94,6 +94,9 @@ let sr_rrds : (string, rrd_info) Hashtbl.t = Hashtbl.create 32
 
 let host_rrd : rrd_info option ref = ref None
 
+let otel_metrics : Opentelemetry_proto.Metrics.resource_metrics option ref =
+  ref None
+
 let rrd_of_fd fd =
   let ic = Unix.in_channel_of_descr fd in
   let input = Xmlm.make_input ~strip:true (`Channel ic) in

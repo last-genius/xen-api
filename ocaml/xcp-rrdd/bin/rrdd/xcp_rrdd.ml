@@ -83,6 +83,8 @@ let start (xmlrpc_path, http_fwd_path) process =
     get_sr_rrd_handler ;
   Http_svr.Server.add_handler server Http.Get
     Rrdd_libs.Constants.get_rrd_updates_uri get_rrd_updates_handler ;
+  Http_svr.Server.add_handler server Http.Get
+    Rrdd_libs.Constants.get_otel_metrics_uri get_otel_metrics_handler ;
   Http_svr.Server.add_handler server Http.Put Rrdd_libs.Constants.put_rrd_uri
     put_rrd_handler ;
   Http_svr.Server.add_handler server Http.Post

@@ -109,9 +109,13 @@ let get_sr_rrd_uri = "/" ^ get_sr_rrd (* ocaml/xapi/xapi.ml *)
 
 let get_rrd_updates = "rrd_updates"
 
+let get_otel_metrics = "metrics"
+
 (* ocaml/xapi/xapi.ml *)
 
 let get_rrd_updates_uri = "/" ^ get_rrd_updates (* ocaml/xapi/xapi.ml *)
+
+let get_otel_metrics_uri = "/" ^ get_otel_metrics
 
 let put_rrd = "rrd"
 

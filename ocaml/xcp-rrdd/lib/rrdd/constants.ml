@@ -31,6 +31,8 @@ let get_rrd_updates = "rrd_updates"
 
 let get_rrd_updates_uri = "/" ^ get_rrd_updates
 
+let get_otel_metrics_uri = "/metrics"
+
 let put_rrd = "rrd"
 
 let put_rrd_uri = "/" ^ put_rrd
