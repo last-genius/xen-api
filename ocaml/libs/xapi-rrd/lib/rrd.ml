@@ -14,6 +14,8 @@
 (** This module provides a util that records data in a way that's compatible
     with {{: http://oss.oetiker.ch/rrdtool/index.en.html} rrdtool}. *)
 
+module D = Debug.Make (struct let name = "rrdlib" end)
+
 module Fring = Rrd_fring
 module Utils = Rrd_utils
 module StringMap = Map.Make (String)
@@ -368,6 +370,8 @@ let process_ds_value ds value interval new_rrd =
         | VT_Int64 x, VT_Int64 y ->
             Int64.to_float (y --- x)
         | VT_Float x, VT_Float y ->
+            if String.starts_with ~prefix:"cpu" ds.ds_name && y -. x < 0. then
+              D.warn "cpunegative" ;
             y -. x
         | VT_Unknown, _ | _, VT_Unknown ->
             nan

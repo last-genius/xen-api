@@ -9,6 +9,7 @@
     rpclib.core
     xmlm
     yojson
+    xapi-log
   )
   (preprocess (pps ppx_deriving_rpc))
 )
