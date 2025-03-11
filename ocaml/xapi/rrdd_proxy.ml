@@ -185,6 +185,16 @@ let get_rrd_updates_forwarder (req : Http.Request.t) (s : Unix.file_descr) _ =
           Http.http_400_badrequest
   )
 
+(* Forward the request for obtaining OpenMetrics metrics to the RRDD HTTP handler. *)
+let get_openmetrics_forwarder (req : Http.Request.t) (s : Unix.file_descr) _ =
+  (* Do not log this event, since commonly called. *)
+  req.Http.Request.close <- true ;
+  Xapi_http.with_context ~dummy:true "Get OpenTelemetry metrics updates." req s
+    (fun __context ->
+      ignore
+        (Xapi_services.hand_over_connection req s !Rrd_interface.forwarded_path)
+  )
+
 let vm_uuid_to_domid ~__context ~(uuid : string) : int =
   let vm = Db.VM.get_by_uuid ~__context ~uuid in
   Int64.to_int (Db.VM.get_domid ~__context ~self:vm)

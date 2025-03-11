@@ -827,6 +827,7 @@ let common_http_handlers () =
     ; (Constants.get_host_rrd, Rrdd_proxy.get_host_rrd_forwarder)
     ; (Constants.get_sr_rrd, Rrdd_proxy.get_sr_rrd_forwarder)
     ; (Constants.get_rrd_updates, Rrdd_proxy.get_rrd_updates_forwarder)
+    ; (Constants.get_openmetrics, Rrdd_proxy.get_openmetrics_forwarder)
     ; (Constants.put_rrd, Rrdd_proxy.put_rrd_forwarder)
     ; ("get_blob", Xapi_blob.handler)
     ; ("put_blob", Xapi_blob.handler)

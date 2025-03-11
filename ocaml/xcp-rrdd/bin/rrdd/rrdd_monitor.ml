@@ -145,8 +145,10 @@ let convert_to_owner_map dss =
     don't accidentally archive the RRD.
     Also resets the value of datasources that are enabled in the RRD, but
     weren't updated on this refresh cycle.
+
+    Handles OpenMetrics updates as well.
     *)
-let update_rrds uuid_domids paused_vms plugins_dss =
+let update_metrics uuid_domids paused_vms plugins_dss =
   let uuid_domids = List.to_seq uuid_domids |> StringMap.of_seq in
   let paused_vms = List.to_seq paused_vms |> StringSet.of_seq in
   let per_owner_flattened_map, per_plugin_map =
@@ -232,19 +234,23 @@ let update_rrds uuid_domids paused_vms plugins_dss =
                             purpose. During a migrate such updates can also cause undesirable
                             discontinuities in the observed value of memory_actual. Hence, we
                             ignore changes from paused domains: *)
-                         ( if not (StringSet.mem vm_uuid paused_vms) then
-                             let named_updates =
-                               StringMap.map to_named_updates dss
-                             in
-                             Rrd.ds_update_named rrd
-                               ~new_rrd:(domid <> rrdi.domid) timestamp
-                               named_updates
+                         if not (StringSet.mem vm_uuid paused_vms) then (
+                           Openmetrics_utils.MetricsMap.add_measurements
+                             open_metrics (VM vm_uuid) dss ;
+                           let named_updates =
+                             StringMap.map to_named_updates dss
+                           in
+                           Rrd.ds_update_named rrd
+                             ~new_rrd:(domid <> rrdi.domid) timestamp
+                             named_updates
                          ) ;
                          Some {rrd; dss= updated_dss; domid}
                      | None ->
                          debug "%s: Creating fresh RRD for VM uuid=%s"
                            __FUNCTION__ vm_uuid ;
                          let dss_list = map_keys_to_list dss in
+                         Openmetrics_utils.MetricsMap.add_measurements
+                           open_metrics (VM vm_uuid) dss ;
                          let rrd =
                            create_fresh_rrd !use_min_max dss_list timestamp
                          in
@@ -271,6 +277,8 @@ let update_rrds uuid_domids paused_vms plugins_dss =
             Option.get
               (StringMap.fold
                  (fun _uid (timestamp, dss) sr_rrdi ->
+                   Openmetrics_utils.MetricsMap.add_measurements open_metrics
+                     (SR sr_uuid) dss ;
                    (* First, potentially update the rrd with any new default dss *)
                    match sr_rrdi with
                    | Some rrdi ->
@@ -306,6 +314,8 @@ let update_rrds uuid_domids paused_vms plugins_dss =
           Option.get
             (StringMap.fold
                (fun _uid (timestamp, dss) host_rrdi ->
+                 Openmetrics_utils.MetricsMap.add_measurements open_metrics Host
+                   dss ;
                  match host_rrdi with
                  | None ->
                      debug "%s: Creating fresh RRD for localhost" __FUNCTION__ ;

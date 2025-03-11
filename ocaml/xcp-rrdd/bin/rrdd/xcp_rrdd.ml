@@ -83,6 +83,8 @@ let start (xmlrpc_path, http_fwd_path) process =
     get_sr_rrd_handler ;
   Http_svr.Server.add_handler server Http.Get
     Rrdd_libs.Constants.get_rrd_updates_uri get_rrd_updates_handler ;
+  Http_svr.Server.add_handler server Http.Get
+    Rrdd_libs.Constants.get_openmetrics_uri get_openmetrics_handler ;
   Http_svr.Server.add_handler server Http.Put Rrdd_libs.Constants.put_rrd_uri
     put_rrd_handler ;
   Http_svr.Server.add_handler server Http.Post
@@ -523,7 +525,9 @@ let do_monitor_write xc writers =
       let uuid_domids = List.map (fun (_, u, i) -> (u, i)) domains in
 
       (* stats are grouped per plugin, which provides its timestamp *)
-      Rrdd_monitor.update_rrds uuid_domids my_paused_vms stats ;
+      D.warn "before update: %f" (Unix.gettimeofday ()) ;
+      Rrdd_monitor.update_metrics uuid_domids my_paused_vms stats ;
+      D.warn "after update: %f" (Unix.gettimeofday ()) ;
 
       Rrdd_libs.Constants.datasource_dump_file
       |> Rrdd_server.dump_host_dss_to_file ;

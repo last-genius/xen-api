@@ -6,12 +6,15 @@
   (libraries
     astring
     ezxenstore
+    fmt
     gzip
     http_lib
     httpsvr
     inotify
     mtime
     mtime.clock.os
+    prometheus
+    prometheus-app
     rpclib.core
     rrd-transport
     rrd-transport.lib
@@ -28,6 +31,7 @@
     xapi-rrd.unix
     rrdd_libs
     xapi-stdext-threads
+    xapi-stdext-std
     xapi-stdext-unix
     xmlm
     yojson

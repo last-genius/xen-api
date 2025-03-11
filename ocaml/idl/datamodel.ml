@@ -10539,12 +10539,12 @@ let all_system =
 (**
    These are the pairs of (object, field) which are bound together in
    the database schema.
-   
+
    It is assumed that, for any entry (p, p'), neither p nor p'
    appears in any other entry. It may be the case that p = p', which
    is the only instance where some object-field pair may appear more
    than once.
-   
+
    This is implicitly assumed by other code which treats this list -
    and its symmetric closure - as an association list
    without duplicate keys. *)
@@ -11031,6 +11031,9 @@ let http_actions =
       , _R_READ_ONLY
       , []
       )
+    )
+  ; ( Constants.get_openmetrics
+    , (Get, Constants.get_openmetrics_uri, true, [], _R_READ_ONLY, [])
     )
   ; ( Constants.put_rrd
     , (Put, Constants.put_rrd_uri, false, [], _R_POOL_ADMIN, [])

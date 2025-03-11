@@ -26,6 +26,8 @@ let archive_sr_rrd (sr_uuid : string) : string =
     with_lock mutex (fun () ->
         match Hashtbl.find_opt sr_rrds sr_uuid with
         | Some rrd ->
+            Openmetrics_utils.MetricsMap.remove_owner open_metrics
+              (Rrd.SR sr_uuid) ;
             Hashtbl.remove sr_rrds sr_uuid ;
             rrd
         | None ->
@@ -58,6 +60,7 @@ let push_sr_rrd (sr_uuid : string) (path : string) : unit =
     match rrd_of_gzip path with
     | Some rrd ->
         debug "Pushing RRD for SR uuid=%s locally" sr_uuid ;
+        (* TODO: Do we need to remove openmetrics here too? *)
         with_lock mutex (fun _ ->
             Hashtbl.replace sr_rrds sr_uuid
               {rrd; dss= Rrd.StringMap.empty; domid= 0}
@@ -89,6 +92,7 @@ let archive_rrd vm_uuid (remote_address : string option) : unit =
       match Hashtbl.find_opt vm_rrds vm_uuid with
       | Some x ->
           let rrd = x.rrd in
+          Openmetrics_utils.MetricsMap.remove_owner open_metrics (Rrd.VM vm_uuid) ;
           Hashtbl.remove vm_rrds vm_uuid ;
           archive_rrd_internal ~transport ~uuid:vm_uuid ~rrd ()
       | None ->
@@ -296,6 +300,7 @@ let migrate_rrd (session_id : string option) (remote_address : string)
       | Some x ->
           debug "Sending RRD for VM uuid=%s to remote host %s for migrate"
             vm_uuid host_uuid ;
+          Openmetrics_utils.MetricsMap.remove_owner open_metrics (Rrd.VM vm_uuid) ;
           Hashtbl.remove vm_rrds vm_uuid ;
           Some x
       | None ->
@@ -351,8 +356,9 @@ let add rrds uuid domid ds_name rrdi =
   let rrd = add_ds ~rrdi ~ds_name in
   Hashtbl.replace rrds uuid {rrd; dss= rrdi.dss; domid}
 
-let forget rrds ~uuid ~ds_name rrdi =
-  Hashtbl.replace rrds uuid {rrdi with rrd= Rrd.rrd_remove_ds rrdi.rrd ds_name}
+let forget rrds ~ds_owner ~uuid ~ds_name rrdi =
+  Hashtbl.replace rrds uuid {rrdi with rrd= Rrd.rrd_remove_ds rrdi.rrd ds_name} ;
+  Openmetrics_utils.MetricsMap.remove_metric open_metrics ds_owner ds_name
 
 let query ds_name rrdi =
   let now = Unix.gettimeofday () in
@@ -370,7 +376,8 @@ let add_host_ds (ds_name : string) : unit =
 let forget_host_ds (ds_name : string) : unit =
   with_lock mutex (fun () ->
       let forget rrdi =
-        host_rrd := Some {rrdi with rrd= Rrd.rrd_remove_ds rrdi.rrd ds_name}
+        host_rrd := Some {rrdi with rrd= Rrd.rrd_remove_ds rrdi.rrd ds_name} ;
+        Openmetrics_utils.MetricsMap.remove_metric open_metrics Rrd.Host ds_name
       in
       Option.iter forget !host_rrd
   )
@@ -507,13 +514,15 @@ let add_vm_ds (vm_uuid : string) (domid : int) (ds_name : string) : unit =
       | None ->
           fail_missing (Printf.sprintf "VM: %s" vm_uuid)
       | Some rrdi ->
+          (* TODO ? *)
           add vm_rrds vm_uuid domid ds_name rrdi
   )
 
 let forget_vm_ds (vm_uuid : string) (ds_name : string) : unit =
   with_lock mutex (fun () ->
       Hashtbl.find_opt vm_rrds vm_uuid
-      |> Option.iter (forget vm_rrds ~uuid:vm_uuid ~ds_name)
+      |> Option.iter
+           (forget vm_rrds ~uuid:vm_uuid ~ds_owner:(Rrd.VM vm_uuid) ~ds_name)
   )
 
 let query_possible_vm_dss (vm_uuid : string) : Data_source.t list =
@@ -542,13 +551,15 @@ let add_sr_ds (sr_uuid : string) (ds_name : string) : unit =
       | None ->
           fail_missing (Printf.sprintf "SR: %s" sr_uuid)
       | Some rrdi ->
+          (* TODO: openmetrics ? *)
           add sr_rrds sr_uuid 0 ds_name rrdi
   )
 
 let forget_sr_ds (sr_uuid : string) (ds_name : string) : unit =
   with_lock mutex (fun () ->
       Hashtbl.find_opt sr_rrds sr_uuid
-      |> Option.iter (forget sr_rrds ~uuid:sr_uuid ~ds_name)
+      |> Option.iter
+           (forget sr_rrds ~uuid:sr_uuid ~ds_owner:(Rrd.SR sr_uuid) ~ds_name)
   )
 
 let query_possible_sr_dss (sr_uuid : string) : Data_source.t list =
