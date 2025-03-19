@@ -25,7 +25,7 @@ functor
       struct
         (* Map of thing -> last update counter *)
         module M = Map.Make (struct
-          type t = Ord.t
+          type t = Interface.Dynamic.id
 
           let compare = compare
         end)
