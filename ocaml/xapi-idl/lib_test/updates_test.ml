@@ -10,6 +10,8 @@ module TestInterface = struct
 
   module Dynamic = struct
     type id = Foo of string | Bar of string [@@deriving rpc]
+
+    let compare = compare
   end
 end
 

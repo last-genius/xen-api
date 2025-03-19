@@ -434,12 +434,12 @@ module VM_DB = struct
     debug "VM_DB.signal %s" id ;
     with_lock m (fun () ->
         if exists id then
-          Updates.add (Dynamic.Vm id) updates
+          Updates.add (Dynamic.Vm (id, Vm.TotalRescan)) updates
     )
 
   let remove id =
     with_lock m (fun () ->
-        Updates.remove (Dynamic.Vm id) updates ;
+        Updates.remove (Dynamic.Vm (id, Vm.TotalRescan)) updates ;
         remove id
     )
 
@@ -3848,7 +3848,7 @@ module UPDATES = struct
           match k with
           | Dynamic.Task _ ->
               false
-          | Dynamic.Vm id
+          | Dynamic.Vm (id, _)
           | Dynamic.Vbd (id, _)
           | Dynamic.Vif (id, _)
           | Dynamic.Pci (id, _)
@@ -3903,7 +3903,7 @@ let internal_event_thread_body =
                  never happen" ;
             List.iter
               (function
-                | Dynamic.Vm id ->
+                | Dynamic.Vm (id, _) ->
                     debug "Received an event on managed VM %s" id ;
                     queue_operation dbg id (VM_check_state id) |> TASK.destroy'
                 | Dynamic.Vbd id ->

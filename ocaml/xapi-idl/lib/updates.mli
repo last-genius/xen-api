@@ -16,7 +16,13 @@ module type INTERFACE = sig
   module Dynamic : sig
     type id
 
+    type update_t
+
+    val update : old:update_t -> with_new:update_t -> update_t
+
     val rpc_of_id : id -> Rpc.t
+
+    val rpc_of_update_t : update_t -> Rpc.t
   end
 end
 
@@ -51,9 +57,9 @@ module Updates : functor (Interface : INTERFACE) -> sig
     -> t
     -> get_result
 
-  (* Add an update to a particular type of item (e.g. 'VM' or 'VBD', defined in
-     INTERFACE) *)
-  val add : Interface.Dynamic.id -> t -> unit
+  (* Add a particular type update to a particular type of item (e.g. 'VM'
+     or 'VBD', defined in INTERFACE) *)
+  val add : Interface.Dynamic.id -> t -> Interface.Dynamic.update_t -> unit
 
   (* Remove an update *)
   val remove : Interface.Dynamic.id -> t -> unit

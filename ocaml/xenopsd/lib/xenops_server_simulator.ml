@@ -184,7 +184,7 @@ let request_shutdown_nolock vm reason () =
               Needs_suspend
           )
     } ;
-  Updates.add (Dynamic.Vm vm.Vm.id) updates ;
+  Updates.add (Dynamic.Vm (vm.Vm.id, Vm.TotalRescan)) updates ;
   true
 
 let save_nolock vm _ _data _vgpu_data () =
@@ -724,11 +724,11 @@ module DEBUG = struct
     | "reboot", [k] ->
         let d = DB.read_exn k in
         DB.write k {d with Domain.domain_action_request= Some Needs_reboot} ;
-        Updates.add (Dynamic.Vm k) updates
+        Updates.add (Dynamic.Vm (k, Vm.TotalRescan)) updates
     | "halt", [k] ->
         let d = DB.read_exn k in
         DB.write k {d with Domain.domain_action_request= Some Needs_poweroff} ;
-        Updates.add (Dynamic.Vm k) updates
+        Updates.add (Dynamic.Vm (k, Vm.TotalRescan)) updates
     | "check-vbd-plug-ordering", [k] ->
         let d = DB.read_exn k in
         let open Vbd in

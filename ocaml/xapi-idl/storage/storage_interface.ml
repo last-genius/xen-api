@@ -336,6 +336,8 @@ module Dynamic = struct
   [@@deriving rpcty]
 
   let rpc_of_id = Rpcmarshal.marshal id.Rpc.Types.ty
+
+  let compare = compare
 end
 
 type uuid = string [@@deriving rpcty]
@@ -625,9 +627,9 @@ module StorageAPI (R : RPC) = struct
       declare "SR.destroy" [] (dbg_p @-> sr_p @-> returning unit_p err)
 
     (** [scan task sr] returns a list of VDIs contained within an attached SR.
-    @deprecated This function is deprecated, and is only here to keep backward 
-    compatibility with old xapis that call Remote.SR.scan during SXM. 
-    Use the scan2 function instead. 
+    @deprecated This function is deprecated, and is only here to keep backward
+    compatibility with old xapis that call Remote.SR.scan during SXM.
+    Use the scan2 function instead.
     *)
     let scan =
       let open TypeCombinators in
@@ -1027,10 +1029,10 @@ module StorageAPI (R : RPC) = struct
         let result_p = Param.mk ~name:"result" Mirror.t in
         declare "DATA.MIRROR.stat" [] (dbg_p @-> id_p @-> returning result_p err)
 
-      (** Called on the receiving end 
-        @deprecated This function is deprecated, and is only here to keep backward 
-        compatibility with old xapis that call Remote.DATA.MIRROR.receive_start during SXM. 
-        Use the receive_start2 function instead. 
+      (** Called on the receiving end
+        @deprecated This function is deprecated, and is only here to keep backward
+        compatibility with old xapis that call Remote.DATA.MIRROR.receive_start during SXM.
+        Use the receive_start2 function instead.
       *)
       let receive_start =
         let similar_p = Param.mk ~name:"similar" Mirror.similars in
@@ -1059,17 +1061,17 @@ module StorageAPI (R : RPC) = struct
           @-> returning result err
           )
 
-      (** Called on the receiving end 
-        @deprecated This function is deprecated, and is only here to keep backward 
+      (** Called on the receiving end
+        @deprecated This function is deprecated, and is only here to keep backward
         compatibility with old xapis that call Remote.DATA.MIRROR.receive_finalize
-        during SXM.  Use the receive_finalize2 function instead. 
+        during SXM.  Use the receive_finalize2 function instead.
       *)
       let receive_finalize =
         declare "DATA.MIRROR.receive_finalize" []
           (dbg_p @-> id_p @-> returning unit_p err)
 
-      (** [receive_finalize2 dbg id] will stop the mirroring process and compose 
-      the snapshot VDI with the mirror VDI. It also cleans up the storage resources 
+      (** [receive_finalize2 dbg id] will stop the mirroring process and compose
+      the snapshot VDI with the mirror VDI. It also cleans up the storage resources
       used by mirroring. It is called after the the source VM is paused. This fucntion
       should be used in conjunction with [receive_start2] *)
       let receive_finalize2 =
@@ -1088,7 +1090,7 @@ module StorageAPI (R : RPC) = struct
         in
         declare "DATA.MIRROR.list" [] (dbg_p @-> returning result_p err)
 
-      (** [import_activate dbg dp sr vdi vm] returns a server socket address to 
+      (** [import_activate dbg dp sr vdi vm] returns a server socket address to
       which a fd can be passed via SCM_RIGHTS for mirroring purposes.*)
       let import_activate =
         declare "DATA.MIRROR.import_activate" []
@@ -1102,7 +1104,7 @@ module StorageAPI (R : RPC) = struct
 
       (** [get_nbd_server dbg dp sr vdi vm] returns the address of a generic nbd
       server that can be connected to. Depending on the backend, this will either
-      be a nbd server backed by tapdisk or qemu-dp. Note this is different 
+      be a nbd server backed by tapdisk or qemu-dp. Note this is different
       from [import_activate] as the returned server does not accept fds. *)
       let get_nbd_server =
         declare "DATA.MIRROR.get_nbd_server" []

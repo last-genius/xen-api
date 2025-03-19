@@ -1174,7 +1174,7 @@ let rec events_watch from =
   let lines =
     List.map
       (function
-        | Vm id ->
+        | Vm (id, _) ->
             Printf.sprintf "VM %s" id
         | Vbd id ->
             Printf.sprintf "VBD %s.%s" (fst id) (snd id)

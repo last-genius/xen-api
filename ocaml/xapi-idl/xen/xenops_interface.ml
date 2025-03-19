@@ -442,9 +442,28 @@ module Dynamic = struct
     | Task of Task.id
   [@@deriving rpcty]
 
+  type update_t = Vm_update of Vm.update | Other [@@deriving rpcty]
+
   type barrier = int * id list [@@deriving rpcty]
 
+  let update ~old ~with_new =
+    match (old, with_new) with
+    | Other, _ ->
+        with_new
+    | Vm_update x, Other ->
+        old
+    | Vm_update x, Vm_update with_new ->
+        Vm_update
+          ( match (x, with_new) with
+          | Vm.TotalRescan, _ | _, Vm.TotalRescan ->
+              Vm.TotalRescan
+          | Vm.DetailedUpdate o, Vm.DetailedUpdate n ->
+              Vm.(DetailedUpdate (merge o n))
+          )
+
   let rpc_of_id = Rpcmarshal.marshal id.Rpc.Types.ty
+
+  let rpc_of_update_t = Rpcmarshal.marshal update_t.Rpc.Types.ty
 end
 
 module Host = struct

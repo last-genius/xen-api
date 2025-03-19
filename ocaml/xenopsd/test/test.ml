@@ -565,7 +565,7 @@ let vm_test_reboot _ =
       Client.DEBUG.trigger dbg "reboot" [id] ;
       (* ... need to wait for the domain id to change *)
       event_wait (function
-        | Dynamic.Vm id' -> (
+        | Dynamic.Vm (id', _) -> (
             id = id'
             &&
             match try Some (Client.VM.stat dbg id) with _ -> None with
@@ -591,7 +591,7 @@ let vm_test_halt _ =
       Client.DEBUG.trigger dbg "halt" [id] ;
       (* ... need to wait for the domain ids to disappear *)
       event_wait (function
-        | Dynamic.Vm id' -> (
+        | Dynamic.Vm (id', _) -> (
             id = id'
             &&
             match try Some (Client.VM.stat dbg id) with _ -> None with
