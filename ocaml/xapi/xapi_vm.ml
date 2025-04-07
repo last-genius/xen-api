@@ -1516,8 +1516,10 @@ let rec import_inner n ~__context ~url ~sr ~full_restore ~force =
   if n > max_redirects then
     let redirect_limit = "Maximum redirect limit reached" in
     raise Api_errors.(Server_error (import_error_generic, [redirect_limit]))
-  else
+  else (
+    warn "importerr url: %s\n" url ;
     let uri = Uri.of_string url in
+    warn "importerr schema: %s\n" (Option.value ~default:"" (Uri.scheme uri)) ;
     try
       Open_uri.with_open_uri uri (fun fd ->
           let module Request =
@@ -1532,7 +1534,9 @@ let rec import_inner n ~__context ~url ~sr ~full_restore ~force =
             ; fd
             }
           in
+          warn "importerr writing\n" ;
           Request.write (fun _ -> ()) request fd ;
+          warn "importerr finished writing\n" ;
           match Response.read ic with
           | `Eof ->
               raise Api_errors.(Server_error (import_error_premature_eof, []))
@@ -1571,6 +1575,7 @@ let rec import_inner n ~__context ~url ~sr ~full_restore ~force =
         import_inner (n + 1) ~__context ~url:redirect ~sr ~full_restore ~force
     | e ->
         raise e
+  )
 
 let import ~__context ~url ~sr ~full_restore ~force =
   import_inner 0 ~__context ~url ~sr ~full_restore ~force
