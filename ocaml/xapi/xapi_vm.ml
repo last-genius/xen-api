@@ -1526,7 +1526,10 @@ let rec import_inner n ~__context ~url ~sr ~full_restore ~force =
             Cohttp.Request.Make (Cohttp_posix_io.Unbuffered_IO) in
           let module Response =
             Cohttp.Response.Make (Cohttp_posix_io.Unbuffered_IO) in
-          let request = Cohttp.Request.make ~meth:`GET uri in
+          let headers = Cohttp.Header.of_list [("Connection", "keep-alive")] in
+          let request =
+            Cohttp.Request.make ~meth:`GET ~version:`HTTP_1_1 ~headers uri
+          in
           let ic =
             {
               Cohttp_posix_io.Unbuffered_IO.header_buffer= None
