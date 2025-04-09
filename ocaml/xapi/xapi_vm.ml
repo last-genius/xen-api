@@ -1540,6 +1540,9 @@ let rec import_inner n ~__context ~url ~sr ~full_restore ~force =
           warn "importerr writing\n" ;
           Request.write (fun _ -> ()) request fd ;
           warn "importerr finished writing\n" ;
+          let buf = Bytes.make 128 '\000' in
+          let ret = Unix.read fd buf 0 64 in
+          warn "importerr read %d bytes: %s" ret (Bytes.to_string buf) ;
           match Response.read ic with
           | `Eof ->
               raise Api_errors.(Server_error (import_error_premature_eof, []))
