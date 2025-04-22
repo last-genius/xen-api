@@ -22,37 +22,29 @@ let unimplemented () =
 
 let run_qcow_tool (progress_cb : int -> unit) (args : string list)
     (ufd : Unix.file_descr) =
-  let qcow_tool = !Xapi_globs.qcow_tool in
+  let qcow_tool = !Xapi_globs.qcow_to_stdout in
   info "Executing %s %s" qcow_tool (String.concat " " args) ;
   let open Forkhelpers in
-  let pipe_read, pipe_write = Unix.pipe () in
-  Xapi_stdext_pervasives.Pervasiveext.finally
-    (fun () ->
-      match
-        with_logfile_fd "qcow-tool" (fun log_fd ->
-            let ufd_str = Uuidx.(to_string (make ())) in
-            let pid =
-              safe_close_and_exec None (Some pipe_write) (Some log_fd)
-                [(ufd_str, ufd)]
-                qcow_tool args
-            in
-            let _, status = waitpid pid in
-            if status <> Unix.WEXITED 0 then (
-              error "qcow-tool failed, returning VDI_IO_ERROR" ;
-              raise
-                (Api_errors.Server_error
-                   (Api_errors.vdi_io_error, ["Device I/O errors"])
-                )
+  match
+    with_logfile_fd "qcow-tool" (fun log_fd ->
+        let pid =
+          safe_close_and_exec None (Some ufd) (Some log_fd) [] qcow_tool args
+        in
+        let _, status = waitpid pid in
+        if status <> Unix.WEXITED 0 then (
+          error "qcow-tool failed, returning VDI_IO_ERROR" ;
+          raise
+            (Api_errors.Server_error
+               (Api_errors.vdi_io_error, ["Device I/O errors"])
             )
         )
-      with
-      | Success (out, _) ->
-          debug "%s" out
-      | Failure (out, e) ->
-          error "qcow-tool output: %s" out ;
-          raise e
     )
-    (fun () -> List.iter Unix.close [pipe_read; pipe_write])
+  with
+  | Success (out, _) ->
+      debug "%s" out
+  | Failure (out, e) ->
+      error "qcow-tool output: %s" out ;
+      raise e
 
 let update_task_progress (__context : Context.t) (x : int) =
   TaskHelper.set_progress ~__context (float_of_int x /. 100.)
@@ -77,17 +69,12 @@ let qcow_of_device path =
 let send (progress_cb : int -> unit) (unix_fd : Unix.file_descr) (path : string)
     (size : Int64.t) =
   debug "Qcow send called with a size of %Ld and path equal to %s" size path ;
-  let _, source =
-    match (Stream_vdi.get_nbd_device path, qcow_of_device path) with
-    | Some (nbd_path, exportname), Some p ->
-        debug "get_nbd_device (path=%s, exportname=%s), p = %s" nbd_path
-          exportname p ;
-        (nbd_path, exportname)
-    | None, Some p ->
-        debug "nbd device not found but p = %s" p ;
-        ("gtn_no_nbd", p)
+  let source =
+    match qcow_of_device path with
+    | Some p ->
+        p
     | _ ->
-        ("gtn_unknown", "gtn_unknown")
+        failwith "Did not find the source of the VDI"
   in
-  let args = ["stream"; "--source"; source; path] in
+  let args = [source; path] in
   run_qcow_tool progress_cb args unix_fd
