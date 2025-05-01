@@ -1582,6 +1582,9 @@ let restore (task : Xenops_task.task_handle) ~xc ~xs ~dm ~store_domid
   let static_max_mib = Memory.mib_of_kib_used static_max_kib in
   let target_mib = Memory.mib_of_kib_used target_kib in
   (* Sanity check. *)
+  warn
+    "static_max_kib: %Lu, target_kib: %Lu, static_max_mib: %Lu, target_mib:\n\
+    \    %Lu" static_max_kib target_kib static_max_mib target_mib ;
   assert (target_mib <= static_max_mib) ;
   let memory, vm_stuff, domain_type =
     match info.priv with
