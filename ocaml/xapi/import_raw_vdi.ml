@@ -158,6 +158,13 @@ let localhost_handler rpc session_id vdi_opt (req : Request.t)
                 in
                 Http_svr.headers s headers ;
                 ( match format with
+                | Qcow ->
+                    Sm_fs_ops.with_block_attached_device __context rpc
+                      session_id vdi `RW (fun path ->
+                        Qcow_tool_wrapper.receive
+                          (Qcow_tool_wrapper.update_task_progress __context)
+                          s path
+                    )
                 | Raw | Vhd ->
                     let prezeroed =
                       not
