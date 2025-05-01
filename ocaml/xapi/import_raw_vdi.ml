@@ -106,7 +106,10 @@ let localhost_handler rpc session_id vdi_opt (req : Request.t)
                      )
                   )
             | None ->
-                let vdi =
+                (* TODO: would be great to error out early if the vdi is smaller than the
+                   virtual size instead of failing on some random write in an unhelpful
+                   manner *)
+                let vdi, qcow_info =
                   match
                     ( vdi_opt
                     , format
@@ -115,13 +118,26 @@ let localhost_handler rpc session_id vdi_opt (req : Request.t)
                     )
                   with
                   | Some vdi, _, _, _ ->
-                      vdi
+                      (vdi, None)
                   | None, Importexport.Format.Raw, Some length, Some sr ->
-                      Client.VDI.create ~rpc ~session_id
-                        ~name_label:"Imported VDI" ~name_description:"" ~sR:sr
-                        ~virtual_size:length ~_type:`user ~sharable:false
-                        ~read_only:false ~other_config:[] ~xenstore_data:[]
-                        ~sm_config:[] ~tags:[]
+                      ( Client.VDI.create ~rpc ~session_id
+                          ~name_label:"Imported VDI" ~name_description:"" ~sR:sr
+                          ~virtual_size:length ~_type:`user ~sharable:false
+                          ~read_only:false ~other_config:[] ~xenstore_data:[]
+                          ~sm_config:[] ~tags:[]
+                      , None
+                      )
+                  | None, Importexport.Format.Qcow, _, Some sr ->
+                      let virtual_size, cluster_bits, data_cluster_map =
+                        Qcow_tool_wrapper.decode_header s
+                      in
+                      ( Client.VDI.create ~rpc ~session_id
+                          ~name_label:"Imported VDI" ~name_description:"" ~sR:sr
+                          ~virtual_size ~_type:`user ~sharable:false
+                          ~read_only:false ~other_config:[] ~xenstore_data:[]
+                          ~sm_config:[] ~tags:[]
+                      , Some (virtual_size, cluster_bits, data_cluster_map)
+                      )
                   | None, Importexport.Format.Vhd, _, _ ->
                       error
                         "Importing a VHD directly into an SR not yet supported" ;
@@ -158,6 +174,13 @@ let localhost_handler rpc session_id vdi_opt (req : Request.t)
                 in
                 Http_svr.headers s headers ;
                 ( match format with
+                | Qcow ->
+                    Sm_fs_ops.with_block_attached_device __context rpc
+                      session_id vdi `RW (fun path ->
+                        Qcow_tool_wrapper.receive
+                          (Qcow_tool_wrapper.update_task_progress __context)
+                          s path qcow_info
+                    )
                 | Raw | Vhd ->
                     let prezeroed =
                       not
