@@ -25,3 +25,8 @@
   )
 )
 
+(install
+  (package qcow-tool)
+  (section bin)
+  (files (main.exe as qcow-tool))
+)
