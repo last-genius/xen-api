@@ -33,6 +33,18 @@ let fail_task_in_request (req : Request.t) (s : Unix.file_descr) e =
 
 exception HandleError of exn * string list
 
+let virtual_size_incompatible =
+  HandleError
+    ( Api_errors.Server_error
+        ( Api_errors.internal_error
+        , [
+            "Virtual size of the VDI selected for import is smaller than the \
+             virtual size of the image."
+          ]
+        )
+    , Http.http_400_badrequest ~version:"1.0" ()
+    )
+
 (* Exception to put into the task * headers to return to the client *)
 
 let localhost_handler rpc session_id vdi_opt (req : Request.t)
@@ -117,6 +129,26 @@ let localhost_handler rpc session_id vdi_opt (req : Request.t)
                     , sr_of_req ~__context req
                     )
                   with
+                  (* If virtual size is known ahead of time, check if VDI is
+                     bigger *)
+                  | Some vdi, Importexport.Format.Raw, Some length, _ ->
+                      if
+                        Client.VDI.get_virtual_size ~rpc ~session_id ~self:vdi
+                        < length
+                      then
+                        raise virtual_size_incompatible
+                      else
+                        (vdi, None)
+                  | Some vdi, Importexport.Format.Qcow, _, _ ->
+                      let header_info = Qcow_tool_wrapper.decode_header s in
+                      let virtual_size, _, _, _ = header_info in
+                      if
+                        Client.VDI.get_virtual_size ~rpc ~session_id ~self:vdi
+                        < virtual_size
+                      then
+                        raise virtual_size_incompatible
+                      else
+                        (vdi, Some header_info)
                   | Some vdi, _, _, _ ->
                       (vdi, None)
                   | None, Importexport.Format.Raw, Some length, Some sr ->
@@ -128,15 +160,14 @@ let localhost_handler rpc session_id vdi_opt (req : Request.t)
                       , None
                       )
                   | None, Importexport.Format.Qcow, _, Some sr ->
-                      let virtual_size, cluster_bits, data_cluster_map =
-                        Qcow_tool_wrapper.decode_header s
-                      in
+                      let header_info = Qcow_tool_wrapper.decode_header s in
+                      let virtual_size, _, _, _ = header_info in
                       ( Client.VDI.create ~rpc ~session_id
                           ~name_label:"Imported VDI" ~name_description:"" ~sR:sr
                           ~virtual_size ~_type:`user ~sharable:false
                           ~read_only:false ~other_config:[] ~xenstore_data:[]
                           ~sm_config:[] ~tags:[]
-                      , Some (virtual_size, cluster_bits, data_cluster_map)
+                      , Some header_info
                       )
                   | None, Importexport.Format.Vhd, _, _ ->
                       error
