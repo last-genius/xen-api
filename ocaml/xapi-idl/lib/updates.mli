@@ -16,7 +16,15 @@ module type INTERFACE = sig
   module Dynamic : sig
     type id
 
+    type update_t
+
+    type id_update = id * update_t
+
+    val update : old:update_t -> with_new:update_t -> update_t
+
     val rpc_of_id : id -> Rpc.t
+
+    val rpc_of_update_t : update_t -> Rpc.t
   end
 end
 
@@ -35,7 +43,9 @@ module Updates : functor (Interface : INTERFACE) -> sig
   (* The return type for `get`. Returns a list of barriers, then a list of
      updates, then a token to pass to the next invocation of `get` *)
   type get_result =
-    (int * Interface.Dynamic.id list) list * Interface.Dynamic.id list * id
+    (int * Interface.Dynamic.id_update list) list
+    * Interface.Dynamic.id_update list
+    * id
 
   (* [get dbg ?with_cancel from timeout t] is a blocking call that will return
      all the updates recorded in [t] since [from] (or for all time if [from] is
@@ -51,9 +61,9 @@ module Updates : functor (Interface : INTERFACE) -> sig
     -> t
     -> get_result
 
-  (* Add an update to a particular type of item (e.g. 'VM' or 'VBD', defined in
-     INTERFACE) *)
-  val add : Interface.Dynamic.id -> t -> unit
+  (* Add a particular type update to a particular type of item (e.g. 'VM'
+     or 'VBD', defined in INTERFACE) *)
+  val add : Interface.Dynamic.id -> Interface.Dynamic.update_t -> t -> unit
 
   (* Remove an update *)
   val remove : Interface.Dynamic.id -> t -> unit
@@ -72,7 +82,7 @@ module Updates : functor (Interface : INTERFACE) -> sig
   (* The Dump module is to dump the internal state of the Updates value for
      debugging purposes *)
   module Dump : sig
-    type u = {id: int; v: string}
+    type u = {id: int; v: string; delta: string}
 
     type dump = {updates: u list; barriers: (int * int * u list) list}
 

@@ -9,7 +9,15 @@ module type INTERFACE = sig
   module Dynamic : sig
     type id
 
+    type update_t
+
+    type id_update = id * update_t
+
+    val update : old:update_t -> with_new:update_t -> update_t
+
     val rpc_of_id : id -> Rpc.t
+
+    val rpc_of_update_t : update_t -> Rpc.t
   end
 end
 
@@ -32,16 +40,20 @@ functor
 
         type id = int
 
+        type node = int * Interface.Dynamic.update_t
+
         (* Type for inner snapshot that we create when injecting a barrier *)
         type barrier = {
             bar_id: int  (** This int is a token from outside. *)
-          ; map_s: int M.t  (** Snapshot of main map *)
+          ; map_s: node M.t  (** Snapshot of main map *)
           ; event_id: id
                 (** Snapshot of "next" from when barrier was injected *)
         }
 
         type t = {
-            map: int M.t  (** Events with incrementing ids from "next" *)
+            map: node M.t
+                (** Events with incrementing ids from "next" and
+            update information *)
           ; barriers: barrier list
           ; next: id
         }
@@ -50,8 +62,19 @@ functor
 
         let empty = {map= M.empty; barriers= []; next= initial + 1}
 
-        let add x t =
-          ( {map= M.add x t.next t.map; barriers= t.barriers; next= t.next + 1}
+        let add x d t =
+          let d =
+            match M.find_opt x t.map with
+            | Some (_id, old) ->
+                Interface.Dynamic.update ~old ~with_new:d
+            | None ->
+                d
+          in
+          ( {
+              map= M.add x (t.next, d) t.map
+            ; barriers= t.barriers
+            ; next= t.next + 1
+            }
           , t.next + 1
           )
 
@@ -89,15 +112,19 @@ functor
         let get from t =
           (* [from] is the id of the most recent event already seen *)
           let get_from_map map =
-            let _before, after = M.partition (fun _ time -> time <= from) map in
+            let _before, after =
+              M.partition (fun _ (time, _) -> time <= from) map
+            in
             let xs, last =
               M.fold
-                (fun key v (acc, m) -> ((key, v) :: acc, max m v))
+                (fun key (v, delta) (acc, m) ->
+                  ((key, v, delta) :: acc, max m v)
+                )
                 after ([], from)
             in
             let xs =
-              List.sort (fun (_, v1) (_, v2) -> compare v1 v2) xs
-              |> List.map fst
+              List.sort (fun (_, v1, _) (_, v2, _) -> compare v1 v2) xs
+              |> List.map (fun (k, _v, delta) -> (k, delta))
             in
             (xs, last)
           in
@@ -148,7 +175,9 @@ functor
       {u= U.empty; c= Condition.create (); s= scheduler; m= Mutex.create ()}
 
     type get_result =
-      (int * Interface.Dynamic.id list) list * Interface.Dynamic.id list * id
+      (int * Interface.Dynamic.id_update list) list
+      * Interface.Dynamic.id_update list
+      * id
 
     let get dbg ?(with_cancel = fun _ f -> f ()) from timeout t =
       let from = Option.value ~default:U.initial from in
@@ -186,9 +215,9 @@ functor
 
     let last_id _dbg t = with_lock t.m (fun () -> U.last_id t.u)
 
-    let add x t =
+    let add x d t =
       with_lock t.m (fun () ->
-          let result, _id = U.add x t.u in
+          let result, _id = U.add x d t.u in
           t.u <- result ;
           Condition.broadcast t.c
       )
@@ -222,7 +251,7 @@ functor
       )
 
     module Dump = struct
-      type u = {id: int; v: string} [@@deriving rpc]
+      type u = {id: int; v: string; delta: string} [@@deriving rpc]
 
       type dump = {
           updates: u list
@@ -234,8 +263,13 @@ functor
 
       let make_list updates =
         U.M.fold
-          (fun key v acc ->
-            {id= v; v= key |> Interface.Dynamic.rpc_of_id |> Jsonrpc.to_string}
+          (fun key (v, delta) acc ->
+            {
+              id= v
+            ; v= key |> Interface.Dynamic.rpc_of_id |> Jsonrpc.to_string
+            ; delta=
+                delta |> Interface.Dynamic.rpc_of_update_t |> Jsonrpc.to_string
+            }
             :: acc
           )
           updates []

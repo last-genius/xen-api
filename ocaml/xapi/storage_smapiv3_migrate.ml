@@ -85,7 +85,7 @@ let mirror_wait ~dbg ~sr ~vdi ~vm ~mirror_id mirror_key =
       D.info "%s qemu mirror %s failed" mirror_id __FUNCTION__ ;
       State.find_active_local_mirror mirror_id
       |> Option.iter (fun (s : State.Send_state.t) -> s.failed <- true) ;
-      Updates.add (Dynamic.Mirror mirror_id) updates ;
+      Updates.add (Dynamic.Mirror mirror_id) Dynamic.Other_update updates ;
       raise
         (Storage_interface.Storage_error
            (Migration_mirror_failure "Mirror failed during syncing")

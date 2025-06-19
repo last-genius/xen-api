@@ -442,9 +442,34 @@ module Dynamic = struct
     | Task of Task.id
   [@@deriving rpcty]
 
-  type barrier = int * id list [@@deriving rpcty]
+  (* Only the VM currently differentiates between two types of updates
+     (TotalRescan carrying no data and DetailedUpdate carrying data).
+     Other types' updates can only be Other *)
+  type update_t = Vm_update of Vm.update | Other_update [@@deriving rpcty]
+
+  type id_update = id * update_t [@@deriving rpcty]
+
+  type barrier = int * id_update list [@@deriving rpcty]
+
+  (* Merges a new update with an old one *)
+  let update ~old ~with_new =
+    match (old, with_new) with
+    | Vm_update _, Other_update | Other_update, Vm_update _ ->
+        assert false
+    | Other_update, Other_update ->
+        with_new
+    | Vm_update x, Vm_update with_new ->
+        Vm_update
+          ( match (x, with_new) with
+          | Vm.TotalRescan, _ | _, Vm.TotalRescan ->
+              Vm.TotalRescan
+          | Vm.DetailedUpdate o, Vm.DetailedUpdate n ->
+              Vm.(DetailedUpdate (merge o n))
+          )
 
   let rpc_of_id = Rpcmarshal.marshal id.Rpc.Types.ty
+
+  let rpc_of_update_t = Rpcmarshal.marshal update_t.Rpc.Types.ty
 end
 
 module Host = struct
@@ -1104,7 +1129,7 @@ module XenopsAPI (R : RPC) = struct
       let timeout_p = Param.mk ~name:"timeout" (option Types.int) in
       let result_p =
         Param.mk ~name:"updates"
-          (triple (list Dynamic.barrier, list Dynamic.id, Types.int))
+          (triple (list Dynamic.barrier, list Dynamic.id_update, Types.int))
       in
       declare "UPDATES.get" []
         (debug_info_p @-> last_p @-> timeout_p @-> returning result_p err)

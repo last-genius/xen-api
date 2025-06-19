@@ -1499,6 +1499,7 @@ functor
       let get _ ~dbg ~from ~timeout =
         let from = try Some (int_of_string from) with _ -> None in
         let _, ids, next = Updates.get dbg from timeout updates in
+        let ids = List.map fst ids in
         (ids, string_of_int next)
     end
   end

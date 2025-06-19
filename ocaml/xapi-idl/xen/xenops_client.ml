@@ -66,7 +66,7 @@ let success_task dbg id =
 
 let wait_for_task dbg id =
   let finished = function
-    | Dynamic.Task id' ->
+    | Dynamic.Task id', _ ->
         id = id' && task_ended dbg id
     | _ ->
         false

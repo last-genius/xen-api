@@ -1174,19 +1174,19 @@ let rec events_watch from =
   let lines =
     List.map
       (function
-        | Vm id ->
+        | Vm id, _ ->
             Printf.sprintf "VM %s" id
-        | Vbd id ->
+        | Vbd id, _ ->
             Printf.sprintf "VBD %s.%s" (fst id) (snd id)
-        | Vif id ->
+        | Vif id, _ ->
             Printf.sprintf "VIF %s.%s" (fst id) (snd id)
-        | Pci id ->
+        | Pci id, _ ->
             Printf.sprintf "PCI %s.%s" (fst id) (snd id)
-        | Task id ->
+        | Task id, _ ->
             Printf.sprintf "Task %s" id
-        | Vgpu id ->
+        | Vgpu id, _ ->
             Printf.sprintf "VGPU %s.%s" (fst id) (snd id)
-        | Vusb id ->
+        | Vusb id, _ ->
             Printf.sprintf "VUSB %s.%s" (fst id) (snd id)
         )
       events

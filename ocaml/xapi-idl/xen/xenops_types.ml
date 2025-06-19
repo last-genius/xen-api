@@ -210,4 +210,95 @@ module Vm = struct
     ; featureset: string
   }
   [@@deriving rpcty, sexp]
+
+  type update_details = {
+      power_state_update: TopLevel.power_state option
+    ; domids_update: int list option
+    ; consoles_update: console list option
+    ; memory_target_update: int64 option
+    ; memory_actual_update: int64 option
+    ; memory_limit_update: int64 option
+    ; vcpu_target_update: int option
+    ; rtc_timeoffset_update: string option
+    ; uncooperative_balloon_driver_update: bool option
+    ; guest_agent_update: (string * string) list option
+    ; xsdata_state_update: (string * string) list option
+    ; pv_drivers_detected_update: bool option
+    ; last_start_time_update: float option
+    ; hvm_update: bool option
+    ; nomigrate_update: bool option
+    ; nested_virt_update: bool option
+    ; domain_type_update: domain_type option
+    ; featureset_update: string option
+  }
+  [@@deriving rpcty]
+
+  type update = TotalRescan | DetailedUpdate of update_details
+  [@@deriving rpcty]
+
+  let empty_update =
+    {
+      power_state_update= None
+    ; domids_update= None
+    ; consoles_update= None
+    ; memory_target_update= None
+    ; memory_actual_update= None
+    ; memory_limit_update= None
+    ; vcpu_target_update= None
+    ; rtc_timeoffset_update= None
+    ; uncooperative_balloon_driver_update= None
+    ; guest_agent_update= None
+    ; xsdata_state_update= None
+    ; pv_drivers_detected_update= None
+    ; last_start_time_update= None
+    ; hvm_update= None
+    ; nomigrate_update= None
+    ; nested_virt_update= None
+    ; domain_type_update= None
+    ; featureset_update= None
+    }
+
+  (* TODO: This is really ugly :( this should really be replaced with a ppx
+     or come C bindings, since they can actually iterate over record's fields
+  *)
+  let merge old with_new =
+    let new_field x y =
+      match (x, y) with None, _ | _, Some _ -> y | Some _, None -> x
+    in
+    {
+      power_state_update=
+        new_field old.power_state_update with_new.power_state_update
+    ; domids_update= new_field old.domids_update with_new.domids_update
+    ; consoles_update= new_field old.consoles_update with_new.consoles_update
+    ; memory_target_update=
+        new_field old.memory_target_update with_new.memory_target_update
+    ; memory_actual_update=
+        new_field old.memory_actual_update with_new.memory_actual_update
+    ; memory_limit_update=
+        new_field old.memory_limit_update with_new.memory_limit_update
+    ; vcpu_target_update=
+        new_field old.vcpu_target_update with_new.vcpu_target_update
+    ; rtc_timeoffset_update=
+        new_field old.rtc_timeoffset_update with_new.rtc_timeoffset_update
+    ; uncooperative_balloon_driver_update=
+        new_field old.uncooperative_balloon_driver_update
+          with_new.uncooperative_balloon_driver_update
+    ; guest_agent_update=
+        new_field old.guest_agent_update with_new.guest_agent_update
+    ; xsdata_state_update=
+        new_field old.xsdata_state_update with_new.xsdata_state_update
+    ; pv_drivers_detected_update=
+        new_field old.pv_drivers_detected_update
+          with_new.pv_drivers_detected_update
+    ; last_start_time_update=
+        new_field old.last_start_time_update with_new.last_start_time_update
+    ; hvm_update= new_field old.hvm_update with_new.hvm_update
+    ; nomigrate_update= new_field old.nomigrate_update with_new.nomigrate_update
+    ; nested_virt_update=
+        new_field old.nested_virt_update with_new.nested_virt_update
+    ; domain_type_update=
+        new_field old.domain_type_update with_new.domain_type_update
+    ; featureset_update=
+        new_field old.featureset_update with_new.featureset_update
+    }
 end

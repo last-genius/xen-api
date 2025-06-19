@@ -77,7 +77,7 @@ let wait_for_task queue_name dbg id =
   let dbg = Debug_info.to_string di in
   let module Client = (val make_client queue_name : XENOPS) in
   let finished = function
-    | Dynamic.Task id' ->
+    | Dynamic.Task id', _ ->
         id = id' && task_ended queue_name dbg id
     | _ ->
         false
@@ -2462,7 +2462,7 @@ let update_vm_internal ~__context ~id ~self ~previous ~info ~localhost =
         XenAPI.VM.update_allowed_operations ~rpc ~session_id ~self
     )
 
-let update_vm ~__context id =
+let update_vm ~__context id delta =
   let@ __context =
     Context.with_tracing
       ~attributes:[("xapi.event.on.vm", id)]
@@ -2480,7 +2480,15 @@ let update_vm ~__context id =
         let module Client =
           (val make_client (queue_of_vm ~__context ~self) : XENOPS)
         in
-        let info = try Some (snd (Client.VM.stat dbg id)) with _ -> None in
+        let info =
+          match delta with
+          | Vm.TotalRescan -> (
+            try Some (snd (Client.VM.stat dbg id)) with _ -> None
+          )
+          | Vm.DetailedUpdate _delta ->
+              (* TODO: Handle properly *)
+              assert false
+        in
         if info <> previous then
           update_vm_internal ~__context ~id ~self ~previous ~info ~localhost
   with e ->
@@ -2975,33 +2983,35 @@ let rec events_watch ~__context cancel queue_name from =
         let do_updates l =
           let open Dynamic in
           List.iter
-            (fun ev ->
+            (fun (ev, delta) ->
               debug "Processing event: %s"
                 (ev |> Dynamic.rpc_of_id |> Jsonrpc.to_string) ;
               if already_done ev then
                 debug "Skipping (already processed this round)"
               else (
                 add_event ev ;
-                match ev with
-                | Vm id ->
+                match (ev, delta) with
+                | Vm id, Vm_update delta ->
                     debug "xenops event on VM %s" id ;
-                    update_vm ~__context id
-                | Vbd id ->
+                    update_vm ~__context id delta
+                | Vm _, Other_update ->
+                    assert false
+                | Vbd id, _ ->
                     debug "xenops event on VBD %s.%s" (fst id) (snd id) ;
                     update_vbd ~__context id
-                | Vif id ->
+                | Vif id, _ ->
                     debug "xenops event on VIF %s.%s" (fst id) (snd id) ;
                     update_vif ~__context id
-                | Pci id ->
+                | Pci id, _ ->
                     debug "xenops event on PCI %s.%s" (fst id) (snd id) ;
                     update_pci ~__context id
-                | Vgpu id ->
+                | Vgpu id, _ ->
                     debug "xenops event on VGPU %s.%s" (fst id) (snd id) ;
                     update_vgpu ~__context id
-                | Vusb id ->
+                | Vusb id, _ ->
                     debug "xenops event on VUSB %s.%s" (fst id) (snd id) ;
                     update_vusb ~__context id
-                | Task id ->
+                | Task id, _ ->
                     debug "xenops event on Task %s" id ;
                     update_task ~__context queue_name id
               )

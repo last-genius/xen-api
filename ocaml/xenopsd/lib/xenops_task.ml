@@ -67,7 +67,7 @@ let task_ended = function
       false
 
 let is_task task = function
-  | Xenops_interface.Dynamic.Task id when id = task ->
+  | Xenops_interface.Dynamic.Task id, _ when id = task ->
       Some Xenops_task.(get_state (handle_of_id tasks id))
   | _ ->
       None

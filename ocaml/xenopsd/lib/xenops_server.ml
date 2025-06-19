@@ -410,7 +410,7 @@ module TASK = struct
       let state = get_state handle in
       debug "TASK.signal %s = %s" id
         (state |> rpc_of Task.state |> Jsonrpc.to_string) ;
-      Updates.add (Dynamic.Task id) updates
+      Updates.add (Dynamic.Task id) Dynamic.Other_update updates
     with Xenopsd_error (Does_not_exist _) ->
       debug "TASK.signal %s (object deleted)" id
 
@@ -454,7 +454,7 @@ module VM_DB = struct
     debug "VM_DB.signal %s" id ;
     with_lock m (fun () ->
         if exists id then
-          Updates.add (Dynamic.Vm id) updates
+          Updates.add (Dynamic.Vm id) Dynamic.(Vm_update Vm.TotalRescan) updates
     )
 
   let remove id =
@@ -503,7 +503,7 @@ module PCI_DB = struct
     debug "PCI_DB.signal %s" (string_of_id id) ;
     with_lock m (fun () ->
         if exists id then
-          Updates.add (Dynamic.Pci id) updates
+          Updates.add (Dynamic.Pci id) Dynamic.Other_update updates
     )
 
   let remove id =
@@ -567,7 +567,7 @@ module VBD_DB = struct
     debug "VBD_DB.signal %s" (string_of_id id) ;
     with_lock m (fun () ->
         if exists id then
-          Updates.add (Dynamic.Vbd id) updates
+          Updates.add (Dynamic.Vbd id) Dynamic.Other_update updates
     )
 
   let remove id =
@@ -627,7 +627,9 @@ module VIF_DB = struct
 
   let signal id =
     debug "VIF_DB.signal %s" (string_of_id id) ;
-    with_lock m (fun () -> Updates.add (Dynamic.Vif id) updates)
+    with_lock m (fun () ->
+        Updates.add (Dynamic.Vif id) Dynamic.Other_update updates
+    )
 
   let remove id =
     with_lock m (fun () ->
@@ -705,7 +707,7 @@ module VGPU_DB = struct
     debug "VGPU_DB.signal %s" (string_of_id id) ;
     with_lock m (fun () ->
         if exists id then
-          Updates.add (Dynamic.Vgpu id) updates
+          Updates.add (Dynamic.Vgpu id) Dynamic.Other_update updates
     )
 
   let remove id =
@@ -766,7 +768,9 @@ module VUSB_DB = struct
 
   let signal id =
     debug "VUSB_DB.signal %s" (string_of_id id) ;
-    with_lock m (fun () -> Updates.add (Dynamic.Vusb id) updates)
+    with_lock m (fun () ->
+        Updates.add (Dynamic.Vusb id) Dynamic.Other_update updates
+    )
 
   let remove id =
     with_lock m (fun () ->
@@ -4098,30 +4102,30 @@ let internal_event_thread_body =
                  never happen" ;
             List.iter
               (function
-                | Dynamic.Vm id ->
+                | Dynamic.Vm id, _ ->
                     debug "Received an event on managed VM %s" id ;
                     queue_operation dbg id (VM_check_state id) |> TASK.destroy'
-                | Dynamic.Vbd id ->
+                | Dynamic.Vbd id, _ ->
                     debug "Received an event on managed VBD %s.%s" (fst id)
                       (snd id) ;
                     queue_operation dbg (VBD_DB.vm_of id) (VBD_check_state id)
                     |> TASK.destroy'
-                | Dynamic.Vif id ->
+                | Dynamic.Vif id, _ ->
                     debug "Received an event on managed VIF %s.%s" (fst id)
                       (snd id) ;
                     queue_operation dbg (VIF_DB.vm_of id) (VIF_check_state id)
                     |> TASK.destroy'
-                | Dynamic.Pci id ->
+                | Dynamic.Pci id, _ ->
                     debug "Received an event on managed PCI %s.%s" (fst id)
                       (snd id) ;
                     queue_operation dbg (PCI_DB.vm_of id) (PCI_check_state id)
                     |> TASK.destroy'
-                | Dynamic.Vusb id ->
+                | Dynamic.Vusb id, _ ->
                     debug "Received an event on managed VUSB %s.%s" (fst id)
                       (snd id) ;
                     queue_operation dbg (VUSB_DB.vm_of id) (VUSB_check_state id)
                     |> TASK.destroy'
-                | x ->
+                | x, _ ->
                     debug "Ignoring event on %s"
                       (Jsonrpc.to_string (rpc_of Dynamic.id x))
                 )

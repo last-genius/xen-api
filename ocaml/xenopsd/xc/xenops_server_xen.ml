@@ -2346,7 +2346,7 @@ module VM = struct
 
   let wait_shutdown task vm _reason timeout =
     let is_vm_event = function
-      | Dynamic.Vm id when id = vm.Vm.id ->
+      | Dynamic.Vm id, _ when id = vm.Vm.id ->
           debug "EVENT on our VM: %s" id ;
           Some ()
       | _ ->
@@ -4920,8 +4920,10 @@ module Actions = struct
                      )
                   )
             in
-            if updated then
-              Updates.add (Dynamic.Vm vm) internal_updates
+            if updated then (* TODO - this is def not total rescan right? *)
+              Updates.add (Dynamic.Vm vm)
+                Dynamic.(Vm_update Vm.TotalRescan)
+                internal_updates
           with Xs_protocol.Enoent _ ->
             warn "Watch event on %s fired but couldn't read from it" path ;
             ()
@@ -4978,7 +4980,9 @@ module Actions = struct
   let unmanaged_domain domid id = domid > 0 && not (DB.exists id)
 
   let found_running_domain _domid id =
-    Updates.add (Dynamic.Vm id) internal_updates
+    Updates.add (Dynamic.Vm id)
+      Dynamic.(Vm_update Vm.TotalRescan)
+      internal_updates
 
   let device_watches = ref IntMap.empty
 
@@ -5083,7 +5087,9 @@ module Actions = struct
       else
         let di = IntMap.find d domains in
         let id = Uuidx.to_string (uuid_of_domain di) in
-        Updates.add (Dynamic.Vm id) internal_updates
+        Updates.add (Dynamic.Vm id)
+          Dynamic.(Vm_update Vm.TotalRescan)
+          internal_updates
     in
     let fire_event_on_device domid kind devid =
       let d = int_of_string domid in
@@ -5109,7 +5115,9 @@ module Actions = struct
               debug "Unknown device kind: '%s'" x ;
               None
         in
-        Option.iter (fun x -> Updates.add x internal_updates) update
+        Option.iter
+          (fun x -> Updates.add x Dynamic.Other_update internal_updates)
+          update
     in
     let fire_event_on_qemu domid =
       let d = int_of_string domid in
@@ -5129,7 +5137,9 @@ module Actions = struct
             let di = IntMap.find d domains in
             let id = Uuidx.to_string (uuid_of_domain di) in
             qemu_disappeared di xc xs ;
-            Updates.add (Dynamic.Vm id) internal_updates
+            Updates.add (Dynamic.Vm id)
+              Dynamic.(Vm_update Vm.TotalRescan)
+              internal_updates
     in
     match Astring.String.cuts ~empty:false ~sep:"/" path with
     | "local"
@@ -5153,6 +5163,7 @@ module Actions = struct
     | ["local"; "domain"; domid; "qemu-pid-signal"] ->
         fire_event_on_qemu domid
     | "local" :: "domain" :: domid :: _ ->
+        (* TODO: this catchall needs to be broken down *)
         fire_event_on_vm domid
     | ["vm"; uuid; "rtc"; "timeoffset"] ->
         let timeoffset = try Some (xs.Xs.read path) with _ -> None in
@@ -5161,7 +5172,9 @@ module Actions = struct
             (* Store the rtc/timeoffset for migrate *)
             store_rtc_timeoffset uuid timeoffset ;
             (* Tell the higher-level toolstack about this too *)
-            Updates.add (Dynamic.Vm uuid) internal_updates
+            Updates.add (Dynamic.Vm uuid)
+              Dynamic.(Vm_update Vm.TotalRescan)
+              internal_updates
           )
           timeoffset
     | _ ->
