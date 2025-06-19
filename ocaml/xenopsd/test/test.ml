@@ -59,7 +59,7 @@ let task_ended dbg id =
 
 let wait_for_task id =
   let finished = function
-    | Dynamic.Task id' ->
+    | Dynamic.Task id', _ ->
         id = id' && task_ended dbg id
     | _x ->
         false
@@ -90,7 +90,7 @@ let wait_for_tasks id =
     event_id := Some next_id ;
     List.iter
       (function
-        | Dynamic.Task id' ->
+        | Dynamic.Task id', _ ->
             (* ignore events on tasks that are not ours, they may have been deleted *)
             if StringSet.mem id' !ids && task_ended dbg id' then
               ids := StringSet.remove id' !ids
@@ -565,7 +565,7 @@ let vm_test_reboot _ =
       Client.DEBUG.trigger dbg "reboot" [id] ;
       (* ... need to wait for the domain id to change *)
       event_wait (function
-        | Dynamic.Vm id' -> (
+        | Dynamic.Vm id', _ -> (
             id = id'
             &&
             match try Some (Client.VM.stat dbg id) with _ -> None with
@@ -591,7 +591,7 @@ let vm_test_halt _ =
       Client.DEBUG.trigger dbg "halt" [id] ;
       (* ... need to wait for the domain ids to disappear *)
       event_wait (function
-        | Dynamic.Vm id' -> (
+        | Dynamic.Vm id', _ -> (
             id = id'
             &&
             match try Some (Client.VM.stat dbg id) with _ -> None with

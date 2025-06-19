@@ -12,7 +12,7 @@ let () =
     ; (* custom tests *)
       ("Test Debug module", Debug_test.tests)
     ; ("Task_server tests", Task_server_test.tests)
-    ; ("Udpates tests", Updates_test.tests)
+    ; ("Updates tests", Updates_test.tests)
     ; ("Scheduler tests", Scheduler_test.tests)
     ; ("Syslog tests", Syslog_test.tests)
     ; ("Cohttp_posix_io tests", Http_test.tests)
