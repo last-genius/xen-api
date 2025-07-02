@@ -552,7 +552,7 @@ let _ =
       "You attempted an operation which needs the VM static-ip-setting feature \
        on a VM which lacks it."
     () ;
-  error Api_errors.vm_lacks_feature ["vm"]
+  error Api_errors.vm_lacks_feature ["vm"; "reason"]
     ~doc:"You attempted an operation on a VM which lacks the feature." () ;
   error Api_errors.vm_is_template ["vm"]
     ~doc:"The operation attempted is not valid for a template VM" () ;
