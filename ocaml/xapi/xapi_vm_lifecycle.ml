@@ -177,11 +177,17 @@ let has_definitely_booted_pv ~vmmr =
 let check_op_for_feature ~__context ~vmr:_ ~vmmr ~vmgmr ~power_state ~op ~ref
     ~strict =
   if
-    power_state <> `Running
+    (power_state <> `Running
     (* PV guests offer support implicitly *)
     || has_definitely_booted_pv ~vmmr
     || Xapi_pv_driver_version.(has_pv_drivers (of_guest_metrics vmgmr))
-    (* Full PV drivers imply all features *)
+       (* Full PV drivers imply all features *)
+    )
+    && not
+         (List.mem op [`suspend; `checkpoint; `pool_migrate; `migrate_send]
+         && has_feature ~vmgmr ~feature:"data-cant-suspend-reason"
+         )
+    (* If QEMU refuses to suspend, this feature is not available *)
   then
     None
   else
@@ -201,7 +207,8 @@ let check_op_for_feature ~__context ~vmr:_ ~vmmr ~vmgmr ~power_state ~op ~ref
     | `changing_VCPUs_live when lack_feature "feature-vcpu-hotplug" ->
         some_err Api_errors.vm_lacks_feature
     | (`suspend | `checkpoint | `pool_migrate | `migrate_send)
-      when strict && lack_feature "feature-suspend" ->
+      when has_feature ~vmgmr ~feature:"data-cant-suspend-reason"
+           || (strict && lack_feature "feature-suspend") ->
         some_err Api_errors.vm_lacks_feature
     | _ ->
         None
