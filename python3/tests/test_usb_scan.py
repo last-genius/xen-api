@@ -19,6 +19,49 @@ sys.modules["xcp.logger"] = MagicMock()
 sys.modules["pyudev"] = MagicMock()
 usb_scan = import_file_as_module("python3/libexec/usb_scan.py")
 
+def get_usb_dongle_params():
+    devices = [
+        {
+            "name": "1-2",
+            "props": {"ID_VENDOR_FROM_DATABASE": "Feitian Technologies, Inc."},
+            "attrs": {
+                "idVendor": b"096e",
+                "bNumInterfaces": b" 1",
+                "bConfigurationValue": b"1",
+                "bcdDevice": b"010a",
+                "version": b" 1.10",
+                "idProduct": b"0302",
+                "bDeviceClass": b"00",
+                "speed": b"480",
+            },
+        }
+    ]
+    interfaces = [
+        {
+            "name": "1-2:1.0",
+            "attrs": {
+                "bInterfaceClass": b"03",
+                "bInterfaceSubClass": b"00",
+                "bInterfaceProtocol": b"00",
+                "bInterfaceNumber": b"00",
+            },
+        }
+    ]
+    results = [
+        {
+            "product-desc": "",
+            "product-id": "0302",
+            "description": "Feitian Technologies, Inc.",
+            "vendor-desc": "Feitian Technologies, Inc.",
+            "version": "1.10",
+            "vendor-id": "096e",
+            "path": "1-2",
+            "serial": "",
+            "speed": "480",
+        }
+    ]
+    return devices, interfaces, results
+
 
 class MocDeviceAttrs(Mapping):
     def __init__(self, device):
@@ -139,46 +182,7 @@ class TestUsbScan(unittest.TestCase):
             self.assertIn(msg, cast(str, cm.exception.code))  # code is a str
 
     def test_usb_dongle(self):
-        devices = [
-            {
-                "name": "1-2",
-                "props": {"ID_VENDOR_FROM_DATABASE": "Feitian Technologies, Inc."},
-                "attrs": {
-                    "idVendor": b"096e",
-                    "bNumInterfaces": b" 1",
-                    "bConfigurationValue": b"1",
-                    "bcdDevice": b"010a",
-                    "version": b" 1.10",
-                    "idProduct": b"0302",
-                    "bDeviceClass": b"00",
-                    "speed": b"480",
-                },
-            }
-        ]
-        interfaces = [
-            {
-                "name": "1-2:1.0",
-                "attrs": {
-                    "bInterfaceClass": b"03",
-                    "bInterfaceSubClass": b"00",
-                    "bInterfaceProtocol": b"00",
-                    "bInterfaceNumber": b"00",
-                },
-            }
-        ]
-        results = [
-            {
-                "product-desc": "",
-                "product-id": "0302",
-                "description": "Feitian Technologies, Inc.",
-                "vendor-desc": "Feitian Technologies, Inc.",
-                "version": "1.10",
-                "vendor-id": "096e",
-                "path": "1-2",
-                "serial": "",
-                "speed": "480",
-            }
-        ]
+        devices, interfaces, results = get_usb_dongle_params()
         self.verify_usb_common(devices, interfaces, results)
 
     def test_usb_dongle_on_hub(self):
@@ -372,3 +376,23 @@ ALLOW:vid=056a pid=0314 class=03  # Wacom Intuos tablet
 ALLOW # Otherwise allow everything else
 """
         self.verify_usb_config_error_common(content, "to unpack")
+
+    def test_usb_config_empty_line(self):
+        content = """# empty line
+ALLOW:vid=056a pid=0314 class=03  # Wacom Intuos tablet
+
+ALLOW # Otherwise allow everything else
+"""
+        self.verify_usb_config_error_common(content, "")
+
+    def test_usb_config_ordering(self):
+        content = """# ordering of deny-allow
+ALLOW:vid=096e pid=0302 class=00  # Feitian device
+
+ALLOW # Otherwise allow everything else
+"""
+        devices, interfaces, results = get_usb_dongle_params()
+        path = os.path.join(self.work_dir, "usb-policy.conf")
+        with open(path, "w") as f:
+            f.write(content)
+        self.verify_usb_exit(devices, interfaces, results, path, "")
