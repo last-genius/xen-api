@@ -71,6 +71,7 @@ module Vm = struct
     | Cirrus
     | Standard_VGA
     | Vgpu
+    | Virtio_VGA
     | IGD_passthrough of igd_passthrough
   [@@default Cirrus] [@@deriving rpcty, sexp]
 

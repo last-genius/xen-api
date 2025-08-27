@@ -1947,6 +1947,7 @@ module Dm_Common = struct
   type disp_intf_opt =
     | Std_vga
     | Cirrus
+    | Virtio_vga
     | Vgpu of Xenops_interface.Vgpu.t list
     | GVT_d
 
@@ -2108,6 +2109,8 @@ module Dm_Common = struct
           ["-std-vga"]
       | Cirrus ->
           []
+      | Virtio_vga ->
+          ["-virtio-vga"]
       | GVT_d ->
           ["-std-vga"]
       (* relies on pci-passthrough *)

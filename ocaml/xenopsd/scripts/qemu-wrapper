@@ -175,11 +175,11 @@ def main(argv):
 
     vga_type = 'cirrus-vga'
     vgamem_mb = 4
+    subvendor_string = "subvendor_id=0x5853,subsystem_id=0x0001"
     vga_extra_props = ["addr=2"]
     vga_extra_props += ["romfile="]
     if trad_compat:
-        vga_extra_props += ["rombar=1",
-                            "subvendor_id=0x5853,subsystem_id=0x0001"]
+        vga_extra_props += ["rombar=1", subvendor_string]
     upgraded_save_image = None
     serial_c = ''
     tmp_serial_c = ''
@@ -246,6 +246,11 @@ def main(argv):
             del qemu_args[n]
             continue
 
+        if p == "-virtio-vga":
+            vga_type = 'virtio-vga'
+            del qemu_args[n]
+            continue
+
         if p == "-vgpu":
             vga_type = 'vgpu'
             del qemu_args[n]
@@ -269,6 +274,9 @@ def main(argv):
 
     if vga_type == 'vgpu':
         qemu_args += ["-device", "vgpu"]
+    elif vga_type == 'virtio-vga':
+        # virtio-vga breaks with vgamem and romfile parameters, don't include them
+        qemu_args += ["-device", ",".join([vga_type, subvendor_string])]
     else:
         qemu_args += ["-device", ",".join([vga_type, "vgamem_mb=%d" % vgamem_mb] \
                                           + vga_extra_props)]

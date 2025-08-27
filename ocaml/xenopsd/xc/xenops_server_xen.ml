@@ -1863,6 +1863,8 @@ module VM = struct
                 Device.Dm.Cirrus
             | Standard_VGA, [] ->
                 Device.Dm.Std_vga
+            | Virtio_VGA, [] ->
+                Device.Dm.Virtio_vga
             | IGD_passthrough GVT_d, [] ->
                 Device.Dm.GVT_d
             | Vgpu, [] ->

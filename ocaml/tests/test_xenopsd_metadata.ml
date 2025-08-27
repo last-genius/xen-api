@@ -126,6 +126,8 @@ module VideoMode = Generic.MakeStateful (struct
           "Cirrus"
       | Vm.Standard_VGA ->
           "Standard_VGA"
+      | Vm.Virtio_VGA ->
+          "Virtio_VGA"
       | Vm.Vgpu ->
           "Vgpu"
       | Vm.IGD_passthrough Vm.GVT_d ->

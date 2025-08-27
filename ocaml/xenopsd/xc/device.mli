@@ -326,6 +326,7 @@ module Dm : sig
   type disp_intf_opt =
     | Std_vga
     | Cirrus
+    | Virtio_vga
     | Vgpu of Xenops_interface.Vgpu.t list
     | GVT_d
 

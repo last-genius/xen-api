@@ -397,6 +397,8 @@ let builder_of_vm ~__context (vmref, vm) timeoffset pci_passthrough vgpu =
           Standard_VGA
       | "cirrus" ->
           Cirrus
+      | "virtio" ->
+          Virtio_VGA
       | x ->
           error "Unknown platform/vga option: %s (expected 'std' or 'cirrus')" x ;
           Cirrus
