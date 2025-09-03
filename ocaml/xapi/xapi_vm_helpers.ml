@@ -695,31 +695,34 @@ let assert_can_boot_here ~__context ~self ~host ~snapshot ~do_cpuid_check
     && not is_local_live_migration
   then
     assert_host_is_enabled ~__context ~host ;
-  (* Check the host can support the VM's required version of virtual hardware platform *)
-  assert_hardware_platform_support ~__context ~vm:self
-    ~host:(Helpers.LocalObject host) ;
-  if do_cpuid_check then
-    Cpuid_helpers.assert_vm_is_compatible ~__context ~vm:(`db self) ~host ;
-  if do_sr_check then
-    assert_can_see_SRs ~__context ~self ~host ;
-  assert_can_see_networks ~__context ~self ~host ;
-  if vm_needs_iommu ~__context ~self then
-    assert_host_has_iommu ~__context ~host ;
-  (* Assumption: a VM can have only one vGPU *)
-  assert_no_legacy_vgpu ~__context ~vm:self ;
-  if has_non_allocated_vgpus ~__context ~self then
-    assert_gpus_available ~__context ~self ~host ;
-  assert_usbs_available ~__context ~self ~host ;
-  assert_netsriov_available ~__context ~self ~host ;
-  ( match Helpers.domain_type ~__context ~self with
-  | `hvm | `pv_in_pvh | `pvh ->
-      assert_host_supports_hvm ~__context ~self ~host
-  | `pv ->
-      ()
+  (* Only check availability of resources if VM is actually going to move *)
+  if not is_local_live_migration then (
+    (* Check the host can support the VM's required version of virtual hardware platform *)
+    assert_hardware_platform_support ~__context ~vm:self
+      ~host:(Helpers.LocalObject host) ;
+    if do_cpuid_check then
+      Cpuid_helpers.assert_vm_is_compatible ~__context ~vm:(`db self) ~host ;
+    if do_sr_check then
+      assert_can_see_SRs ~__context ~self ~host ;
+    assert_can_see_networks ~__context ~self ~host ;
+    if vm_needs_iommu ~__context ~self then
+      assert_host_has_iommu ~__context ~host ;
+    (* Assumption: a VM can have only one vGPU *)
+    assert_no_legacy_vgpu ~__context ~vm:self ;
+    if has_non_allocated_vgpus ~__context ~self then
+      assert_gpus_available ~__context ~self ~host ;
+    assert_usbs_available ~__context ~self ~host ;
+    assert_netsriov_available ~__context ~self ~host ;
+    ( match Helpers.domain_type ~__context ~self with
+    | `hvm | `pv_in_pvh | `pvh ->
+        assert_host_supports_hvm ~__context ~self ~host
+    | `pv ->
+        ()
+    ) ;
+    if do_memory_check then
+      assert_enough_memory_available ~__context ~self ~host ~snapshot ;
+    assert_enough_pcpus ~__context ~self ~host ()
   ) ;
-  if do_memory_check then
-    assert_enough_memory_available ~__context ~self ~host ~snapshot ;
-  assert_enough_pcpus ~__context ~self ~host () ;
   debug "All fine, VM %s can run on host %s!" (Ref.string_of self)
     (Ref.string_of host)
 
