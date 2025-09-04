@@ -3354,14 +3354,17 @@ functor
           (host_uuid ~__context host) ;
         Local.Host.get_management_interface ~__context ~host
 
-      let disable ~__context ~host =
-        info "Host.disable: host = '%s'" (host_uuid ~__context host) ;
+      let disable ~__context ~host ~host_disabled_until_reboot =
+        info "Host.disable: host = '%s', host_disabled_until_reboot = '%b'"
+          (host_uuid ~__context host)
+          host_disabled_until_reboot ;
         (* Block call if this would break our VM restart plan *)
         Xapi_ha_vm_failover.assert_host_disable_preserves_ha_plan ~__context
           host ;
-        let local_fn = Local.Host.disable ~host in
+        let local_fn = Local.Host.disable ~host ~host_disabled_until_reboot in
         do_op_on ~local_fn ~__context ~host (fun session_id rpc ->
             Client.Host.disable ~rpc ~session_id ~host
+              ~host_disabled_until_reboot
         ) ;
         Xapi_host_helpers.update_allowed_operations ~__context ~self:host
 
