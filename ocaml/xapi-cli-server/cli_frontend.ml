@@ -573,8 +573,12 @@ let rec cmdtable_data : (string * cmd_spec) list =
   ; ( "host-disable"
     , {
         reqd= []
-      ; optn= []
-      ; help= "Disable the XE host."
+      ; optn= ["host-disabled-until-reboot"; "host-disabled-across-reboot"]
+      ; help=
+          "Disable the XE host. Setting host-disabled-until-reboot will keep \
+           the host disabled until the next host reboot (across toolstack \
+           restarts). Setting host-disabled-across-reboot will keep the host \
+           persistently disabled until manually re-enabled with Host.enable."
       ; implementation= No_fd Cli_operations.host_disable
       ; flags= [Host_selectors]
       }
