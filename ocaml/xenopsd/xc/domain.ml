@@ -32,6 +32,8 @@ type xen_arm_arch_domainconfig = Xenctrl.xen_arm_arch_domainconfig = {
     gic_version: int
   ; nr_spis: int
   ; clock_frequency: int32
+        (*; sve_vl: int*)
+        (*; tee_type: int*)
 }
 [@@deriving rpcty]
 
