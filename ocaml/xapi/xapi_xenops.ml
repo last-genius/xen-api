@@ -538,6 +538,8 @@ let builder_of_vm ~__context (vmref, vm) timeoffset pci_passthrough vgpu =
       PVH (make_direct_boot_record options)
   | `pvh, Helpers.Indirect options ->
       PVH (make_indirect_boot_record options)
+  | `arm, Helpers.Direct options ->
+      ARM (make_direct_boot_record options)
   | _ ->
       Helpers.internal_error "invalid boot configuration"
 
@@ -566,7 +568,7 @@ module MD = struct
       match vm.API.vM_domain_type with
       | `hvm ->
           true
-      | `pv_in_pvh | `pv | `pvh | `unspecified ->
+      | `pv_in_pvh | `pv | `pvh | `arm | `unspecified ->
           false
     in
     let device_number =
@@ -2095,6 +2097,8 @@ let update_vm_internal ~__context ~id ~self ~previous ~info ~localhost =
           update `pv_in_pvh
       | Domain_PVH ->
           update `pvh
+      | Domain_ARM ->
+          update `arm
       | Domain_undefined ->
           if power_state <> `Halted then
             debug

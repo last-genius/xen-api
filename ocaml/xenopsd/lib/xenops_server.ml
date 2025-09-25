@@ -1349,6 +1349,23 @@ let export_metadata vdi_map vif_map vgpu_pci_map id =
   let vm_t = VM_DB.read_exn id in
   debug "Remapping bootloader VDIs" ;
   (* Remap the bootloader vdis *)
+  let change_bootloader pv_info =
+    {
+      pv_info with
+      Vm.boot=
+        ( match pv_info.Vm.boot with
+        | Vm.Direct _ ->
+            pv_info.Vm.boot
+        | Vm.Indirect pv_indirect_boot ->
+            Vm.Indirect
+              {
+                pv_indirect_boot with
+                Vm.devices=
+                  List.map (remap_vdi vdi_map) pv_indirect_boot.Vm.devices
+              }
+        )
+    }
+  in
   let vm_t =
     {
       vm_t with
@@ -1357,59 +1374,13 @@ let export_metadata vdi_map vif_map vgpu_pci_map id =
         | Vm.HVM _ ->
             vm_t.Vm.ty
         | Vm.PV pv_info ->
-            Vm.PV
-              {
-                pv_info with
-                Vm.boot=
-                  ( match pv_info.Vm.boot with
-                  | Vm.Direct _ ->
-                      pv_info.Vm.boot
-                  | Vm.Indirect pv_indirect_boot ->
-                      Vm.Indirect
-                        {
-                          pv_indirect_boot with
-                          Vm.devices=
-                            List.map (remap_vdi vdi_map)
-                              pv_indirect_boot.Vm.devices
-                        }
-                  )
-              }
+            Vm.PV (change_bootloader pv_info)
         | Vm.PVinPVH pv_info ->
-            Vm.PVinPVH
-              {
-                pv_info with
-                Vm.boot=
-                  ( match pv_info.Vm.boot with
-                  | Vm.Direct _ ->
-                      pv_info.Vm.boot
-                  | Vm.Indirect pv_indirect_boot ->
-                      Vm.Indirect
-                        {
-                          pv_indirect_boot with
-                          Vm.devices=
-                            List.map (remap_vdi vdi_map)
-                              pv_indirect_boot.Vm.devices
-                        }
-                  )
-              }
+            Vm.PVinPVH (change_bootloader pv_info)
         | Vm.PVH pv_info ->
-            Vm.PVH
-              {
-                pv_info with
-                Vm.boot=
-                  ( match pv_info.Vm.boot with
-                  | Vm.Direct _ ->
-                      pv_info.Vm.boot
-                  | Vm.Indirect pv_indirect_boot ->
-                      Vm.Indirect
-                        {
-                          pv_indirect_boot with
-                          Vm.devices=
-                            List.map (remap_vdi vdi_map)
-                              pv_indirect_boot.Vm.devices
-                        }
-                  )
-              }
+            Vm.PVH (change_bootloader pv_info)
+        | Vm.ARM pv_info ->
+            Vm.ARM (change_bootloader pv_info)
         )
     }
   in
@@ -1489,6 +1460,8 @@ let import_metadata id md =
             Host.(stat.cpu_info.features_hvm)
         | PV _ ->
             Host.(stat.cpu_info.features_pv)
+        | ARM _ ->
+            failwith "not implemented"
       in
       let fs' = CPU_policy.to_string fs in
       debug "Setting Platformdata:featureset=%s" fs' ;

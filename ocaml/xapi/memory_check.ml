@@ -31,7 +31,7 @@ let vm_compute_required_memory vm_record guest_memory_kib =
   (* unused in this function *)
   let multiplier, full_config =
     match Helpers.check_domain_type vm_record.API.vM_domain_type with
-    | `hvm | `pvh ->
+    | `hvm | `pvh | `arm ->
         (vm_record.API.vM_HVM_shadow_multiplier, Memory.HVM.full_config)
     | `pv_in_pvh ->
         (vm_record.API.vM_HVM_shadow_multiplier, Memory.PVinPVH.full_config)
@@ -245,7 +245,7 @@ let vm_compute_memory_overhead ~vm_record =
   let vcpu_count = Int64.to_int vm_record.API.vM_VCPUs_max in
   let model =
     match Helpers.check_domain_type vm_record.API.vM_domain_type with
-    | `hvm | `pvh ->
+    | `hvm | `pvh | `arm ->
         Memory.HVM.overhead_mib
     | `pv_in_pvh ->
         Memory.PVinPVH.overhead_mib

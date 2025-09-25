@@ -118,10 +118,15 @@ val typ_of_build_pvh_info : build_pvh_info Rpc.Types.typ
 
 val build_pvh_info : build_pvh_info Rpc.Types.def
 
+type build_arm_info = {cmdline: string (* ...... *)}
+
+val build_arm_info : build_arm_info Rpc.Types.def
+
 type builder_spec_info =
   | BuildHVM of build_hvm_info
   | BuildPV of build_pv_info
   | BuildPVH of build_pvh_info
+  | BuildARM of build_arm_info
 
 val typ_of_builder_spec_info : builder_spec_info Rpc.Types.typ
 

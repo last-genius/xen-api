@@ -152,6 +152,8 @@ module VmExtra = struct
         X86 {emulation_flags= emulation_flags_pvh; misc_flags}
     | HVM _ ->
         X86 {emulation_flags= emulation_flags_all; misc_flags}
+    | ARM _ ->
+        ARM {gic_version= 2; nr_spis= -1; clock_frequency= 0l}
 
   (* Known versions of the VM persistent metadata created by xenopsd *)
   let persistent_version_pre_lima = 0
@@ -989,6 +991,7 @@ module HOST = struct
           p.nr_cpus / (p.threads_per_core * p.cores_per_socket)
         in
         let threads_per_core = p.threads_per_core in
+        (* This is an x86-only call - ARM should return empty arrays here *)
         let features = get_cpu_featureset xc Featureset_host in
         (* this is Default policy in Xen's terminology, used on boot for new VMs *)
         let features_pv_host = get_cpu_featureset xc Featureset_pv in
@@ -1153,7 +1156,7 @@ let dm_of ~vm =
       try
         let vmextra = DB.read_exn vm in
         match VmExtra.(vmextra.persistent.profile, vmextra.persistent.ty) with
-        | None, Some (PV _ | PVinPVH _ | PVH _) ->
+        | None, Some (PV _ | PVinPVH _ | PVH _ | ARM _) ->
             Device.Profile.Qemu_none
         | None, (Some (HVM _) | None) ->
             Device.Profile.fallback
@@ -1186,8 +1189,8 @@ module VM = struct
           Memory.Linux.overhead_mib
       | Some (PVinPVH _) ->
           Memory.PVinPVH.overhead_mib
-      | Some (HVM _ | PVH _) ->
-          Memory.HVM.overhead_mib
+      | Some (HVM _ | PVH _ | ARM _) ->
+          Memory.HVM.overhead_mib (* ARM is HVM + ACPI size *)
       | None ->
           failwith
             "cannot compute memory overhead: unable to determine domain type"
@@ -1234,6 +1237,8 @@ module VM = struct
           "pv-in-pvh"
       | PVH _ ->
           "pvh"
+      | ARM _ ->
+          "arm-pvh"
     in
     xs.Xs.write (domain_type_path domid) domain_type
 
@@ -1248,6 +1253,8 @@ module VM = struct
           Domain_PVinPVH
       | "pvh" ->
           Domain_PVH
+      | "arm-pvh" ->
+          Domain_ARM
       | x ->
           warn "domid = %d; Undefined domain type found (%s)" di.Xenctrl.domid x ;
           Domain_undefined
@@ -1277,7 +1284,7 @@ module VM = struct
           raise (Xenopsd_error No_bootable_device)
       | PV {boot= Indirect {devices= _ :: _; _}; _} ->
           Domain.BuildPV {Domain.cmdline= ""; ramdisk= None}
-      | PVinPVH _ | PVH _ ->
+      | PVinPVH _ | PVH _ | ARM _ ->
           failwith "This domain type did not exist pre-xenopsd"
     in
     let build_info =
@@ -1304,9 +1311,10 @@ module VM = struct
     |> Jsonrpc.to_string
 
   let generate_create_info ~xs:_ vm persistent =
+    (* TODO *)
     let ty = match persistent.VmExtra.ty with Some ty -> ty | None -> vm.ty in
     let hvm =
-      match ty with HVM _ | PVinPVH _ | PVH _ -> true | PV _ -> false
+      match ty with HVM _ | PVinPVH _ | PVH _ | ARM _ -> true | PV _ -> false
     in
     (* XXX add per-vcpu information to the platform data *)
     (* VCPU configuration *)
@@ -1922,11 +1930,14 @@ module VM = struct
             None
         | PV {framebuffer= true; _}
         | PVinPVH {framebuffer= true; _}
-        | PVH {framebuffer= true; _} ->
+        | PVH {framebuffer= true; _}
+        | ARM {framebuffer= true; _} ->
             debug
               "Ignoring request for a PV VNC console (would require qemu-trad)" ;
             None
         | PVinPVH {framebuffer= false; _} | PVH {framebuffer= false; _} ->
+            None
+        | ARM {framebuffer= false; _} ->
             None
         | HVM hvm_info ->
             let disks =
@@ -2190,6 +2201,14 @@ module VM = struct
                   , ""
                   )
               )
+          | ARM {boot= Indirect _; _} ->
+              (* TODO - handle or introduce the right error *)
+              raise (Xenopsd_error No_bootable_device)
+          | ARM {boot= Direct direct; _} ->
+              let builder_spec_info =
+                Domain.(BuildARM {cmdline= direct.cmdline})
+              in
+              (make_build_info direct.kernel builder_spec_info, "")
         in
 
         Domain.build task ~xc ~xs ~store_domid ~console_domid ~timeoffset
@@ -2281,14 +2300,15 @@ module VM = struct
               (if saved_state then Device.Dm.restore else Device.Dm.start)
                 task ~xc ~xs ~dm:qemu_dm info di.Xenctrl.domid ;
               Device.Serial.update_xenstore ~xs di.Xenctrl.domid
-          | Vm.PV _ | Vm.PVinPVH _ | Vm.PVH _ ->
+          | Vm.PV _ | Vm.PVinPVH _ | Vm.PVH _ | Vm.ARM _ ->
               assert false
         )
         (create_device_model_config vm vmextra vbds vifs vgpus vusbs) ;
       match vm.Vm.ty with
       | PV {vncterm; vncterm_ip= ip; _}
       | PVH {vncterm; vncterm_ip= ip; _}
-      | PVinPVH {vncterm; vncterm_ip= ip; _} ->
+      | PVinPVH {vncterm; vncterm_ip= ip; _}
+      | ARM {vncterm; vncterm_ip= ip; _} ->
           if vncterm then
             Service.PV_Vnc.start ~xs ?ip di.Xenctrl.domid
       | HVM _ ->
@@ -2332,7 +2352,7 @@ module VM = struct
               `hvm
           | Vm.Domain_PV ->
               `pv
-          | Vm.Domain_PVinPVH | Vm.Domain_PVH ->
+          | Vm.Domain_PVinPVH | Vm.Domain_PVH | Vm.Domain_ARM ->
               `pvh
           | Vm.Domain_undefined ->
               failwith "undefined domain type: cannot save"
@@ -2450,7 +2470,7 @@ module VM = struct
               `hvm
           | Vm.Domain_PV ->
               `pv
-          | Vm.Domain_PVinPVH | Vm.Domain_PVH ->
+          | Vm.Domain_PVinPVH | Vm.Domain_PVH | Vm.Domain_ARM ->
               `pvh
           | Vm.Domain_undefined ->
               failwith "undefined domain type: cannot save"

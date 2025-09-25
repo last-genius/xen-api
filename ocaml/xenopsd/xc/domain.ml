@@ -30,8 +30,12 @@ let with_lock = Xapi_stdext_threads.Threadext.Mutex.execute
 
 type xen_arm_arch_domainconfig = Xenctrl.xen_arm_arch_domainconfig = {
     gic_version: int
-  ; nr_spis: int
+        (*#define XEN_DOMCTL_CONFIG_GIC_NATIVE    0
+          #define XEN_DOMCTL_CONFIG_GIC_V2        1
+          #define XEN_DOMCTL_CONFIG_GIC_V3        2*)
+  ; nr_spis: int (* #define LIBXL_NR_SPIS_DEFAULT (~(uint32_t)0) *)
   ; clock_frequency: int32
+        (* this is an OUT parameter, it's ignored as an input *)
         (*; sve_vl: int*)
         (*; tee_type: int*)
 }
@@ -144,10 +148,13 @@ type build_pvh_info = {
 }
 [@@deriving rpcty]
 
+type build_arm_info = {cmdline: string (* ...... *)} [@@deriving rpcty]
+
 type builder_spec_info =
   | BuildHVM of build_hvm_info
   | BuildPV of build_pv_info
   | BuildPVH of build_pvh_info
+  | BuildARM of build_arm_info
 [@@deriving rpcty]
 
 type build_info = {
@@ -2006,7 +2013,7 @@ let suspend (task : Xenops_task.task_handle) ~xc ~xs ~domain_type ~is_uefi ~dm
     (* Currently Qemu suspended inside above call with the libxc memory image,
        we should try putting it below in the relevant section of the
        suspend-image-writing *)
-    ( if domain_type = `hvm then
+    ( if hvm then
         write_qemu_record domid uuid main_fd
       else
         return ()

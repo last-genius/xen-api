@@ -51,7 +51,10 @@ let get_flags_for_vm ~__context domain_type cpu_info =
         features_hvm
     | `pv ->
         features_pv
+    | `arm ->
+        failwith "not implemented"
   in
+  (* TODO: arm policy / vendor handling *)
   let vendor = List.assoc Constants.cpu_info_vendor_key cpu_info in
   let migration = Map_check.getf features_field cpu_info in
   (vendor, migration)
@@ -72,6 +75,8 @@ let next_boot_cpu_features ~__context ~vm =
         features_hvm_host
     | `pv ->
         features_pv_host
+    | `arm ->
+        failwith "not implemented"
   in
   Map_check.getf features_field_boot pool_cpu_info
   |> Xenops_interface.CPU_policy.to_string

@@ -2316,6 +2316,7 @@ let domain_type =
       ; ("pv", "PV: Paravirtualised")
       ; ("pv_in_pvh", "PV inside a PVH container")
       ; ("pvh", "PVH")
+      ; ("arm", "The only type of a VM on the ARM platform")
       ; ("unspecified", "Not specified or unknown domain type")
       ]
     )

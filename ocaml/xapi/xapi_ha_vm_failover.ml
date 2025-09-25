@@ -189,7 +189,7 @@ let host_free_memory ~__context ~host =
 let vm_memory ~__context snapshot =
   let policy =
     match Helpers.check_domain_type snapshot.API.vM_domain_type with
-    | `hvm | `pv ->
+    | `hvm | `pv | `arm ->
         Memory_check.Dynamic_min
     | `pv_in_pvh | `pvh ->
         Memory_check.Static_max
