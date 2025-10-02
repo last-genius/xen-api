@@ -50,7 +50,10 @@ module Fd = struct
 
   let openfile filename rw =
     let unix_fd = File.openfile filename rw 0o644 in
-    let fd = Lwt_unix.of_unix_file_descr unix_fd in
+    let fd = Lwt_unix.of_unix_file_descr ~blocking:false unix_fd in
+    Lwt_unix.blocking fd >>= fun blocking ->
+    if blocking then
+      failwith (Printf.sprintf "blocking? : %b\n" blocking) ;
     let lock = Lwt_mutex.create () in
     return {fd; lock}
 
@@ -111,36 +114,30 @@ module Fd = struct
             )
     )
 
-  let really_write {fd; lock; _} offset (* in file *) buf =
+  let really_write {fd; _} file_offset buf =
     (* All reads and writes should be sector-aligned *)
-    assert_sector_aligned offset ;
+    assert_sector_aligned file_offset ;
     assert_sector_aligned (Int64.of_int buf.Cstruct.off) ;
     assert_sector_aligned (Int64.of_int (Cstruct.length buf)) ;
 
-    Lwt_mutex.with_lock lock (fun () ->
-        Lwt.catch
-          (fun () ->
-            Lwt_unix.LargeFile.lseek fd offset Unix.SEEK_SET >>= fun _ ->
-            complete "write" (Some offset) Lwt_bytes.write fd buf
-          )
-          (function
-            | Unix.Unix_error (Unix.EINVAL, "write", "") as e ->
-                Printf.fprintf stderr
-                  "really_write offset = %Ld len = %d: EINVAL (alignment?)\n%!"
-                  offset (Cstruct.length buf) ;
-                fail e
-            | End_of_file as e ->
-                Printf.fprintf stderr
-                  "really_write offset = %Ld len = %d: End_of_file\n%!" offset
-                  (Cstruct.length buf) ;
-                fail e
-            | e ->
-                Printf.fprintf stderr
-                  "really_write offset = %Ld len = %d: %s\n%!" offset
-                  (Cstruct.length buf) (Printexc.to_string e) ;
-                fail e
-            )
-    )
+    let pwrite fd buf ~file_offset ~buf_offset ~len =
+      Pwrite.pwrite fd buf ~file_offset buf_offset len
+    in
+    let open Lwt.Syntax in
+    let open Lwt in
+    let rec loop buf file_offset buf_offset len =
+      let* wrote_bytes_nr = pwrite fd buf ~file_offset ~buf_offset ~len in
+      if wrote_bytes_nr = len then
+        return ()
+      else if wrote_bytes_nr = 0 then
+        fail End_of_file
+      else
+        loop buf
+          (file_offset + wrote_bytes_nr)
+          (buf_offset + wrote_bytes_nr)
+          (len - wrote_bytes_nr)
+    in
+    loop buf.Cstruct.buffer (Int64.to_int file_offset) 0 (Cstruct.length buf)
 
   let lseek {fd; _} ofs cmd = Lwt_unix.LargeFile.lseek fd ofs cmd
 

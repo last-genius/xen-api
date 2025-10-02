@@ -4,4 +4,4 @@
  (libraries bigarray-compat cstruct-lwt cstruct lwt lwt.unix mirage-block vhd-format rresult unix)
  (foreign_stubs
    (language c)
-   (names blkgetsize64_stubs lseek64_stubs odirect_stubs)))
+   (names blkgetsize64_stubs lseek64_stubs odirect_stubs pwrite_stubs)))

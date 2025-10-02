@@ -18,7 +18,9 @@ external openfile_unbuffered : string -> bool -> int -> Unix.file_descr
   = "stub_openfile_direct"
 
 let openfile_buffered filename rw perm =
-  Unix.openfile filename [(if rw then Unix.O_RDWR else Unix.O_RDONLY)] perm
+  Unix.openfile filename
+    [(if rw then Unix.O_RDWR else Unix.O_RDONLY); Unix.O_NONBLOCK]
+    perm
 
 let openfile filename rw perm =
   (if !use_unbuffered then openfile_unbuffered else openfile_buffered)

@@ -1357,11 +1357,18 @@ let serve common_options source source_fd source_format source_protocol
           endpoint_of_string source
       | Some fd ->
           return
-            (File_descr (Lwt_unix.of_unix_file_descr (file_descr_of_int fd)))
+            (File_descr
+               (Lwt_unix.of_unix_file_descr ~blocking:false
+                  (file_descr_of_int fd)
+               )
+            )
       )
       >>= fun source_endpoint ->
       ( match source_endpoint with
       | File_descr fd ->
+          (*Lwt_unix.blocking fd >>= fun blocking ->*)
+          (*if true then*)
+          (*failwith (Printf.sprintf "blocking? : %b\n" blocking );*)
           Channels.of_raw_fd fd >>= fun c -> return c
       | Sockaddr s ->
           let sock = socket s in
