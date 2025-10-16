@@ -108,6 +108,7 @@ type domctl_create_config = Xenctrl.domctl_create_config = {
   ; max_grant_frames: int
   ; max_maptrack_frames: int
   ; max_grant_version: int
+  ; vmtrace_buf_kb: int32
   ; cpupool_id: int32
   ; arch: arch_domainconfig
 }
@@ -465,6 +466,7 @@ let make ~xc ~xs vm_info vcpus domain_config uuid final_uuid no_sharept
         )
     ; max_grant_version=
         (if List.mem CAP_Gnttab_v2 host_info.capabilities then 2 else 1)
+    ; vmtrace_buf_kb= 0l
     ; cpupool_id= 0l
     ; arch= domain_config
     }
