@@ -6,5 +6,10 @@
   (libraries
     qcow-stream
     cmdliner
+    unix
+    lwt.unix
+    lwt
+    qcow-types
+    yojson
   )
 )
