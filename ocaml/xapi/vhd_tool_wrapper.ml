@@ -112,6 +112,34 @@ let receive progress_cb format protocol (s : Unix.file_descr)
   in
   run_vhd_tool progress_cb args s s' path
 
+let read_headers path =
+  let vhd_tool = !Xapi_globs.vhd_tool in
+  let args = ["read_headers"; path] in
+  let pipe_reader, pipe_writer = Unix.pipe ~cloexec:true () in
+
+  let progress_cb _ = () in
+  Xapi_stdext_pervasives.Pervasiveext.finally
+    (fun () ->
+      Qcow_tool_wrapper.run_qcow_tool vhd_tool progress_cb args
+        ~output_fd:pipe_writer
+    )
+    (fun () -> Unix.close pipe_writer) ;
+  pipe_reader
+
+let parse_header path =
+  let pipe_reader = read_headers path in
+  let ic = Unix.in_channel_of_descr pipe_reader in
+  let buf = Buffer.create 4096 in
+  let json = Yojson.Basic.from_channel ~buf ~fname:"vhd_header.json" ic in
+  In_channel.close ic ;
+  let block_size =
+    1 lsl Yojson.Basic.Util.(member "block_bits" json |> to_int)
+  in
+  let block_list =
+    Yojson.Basic.Util.(member "data_blocks" json |> to_list |> List.map to_int)
+  in
+  (block_size, block_list)
+
 let send progress_cb ?relative_to (protocol : string) (dest_format : string)
     (s : Unix.file_descr) (path : string) (size : Int64.t) (prefix : string) =
   let vhd_of_device =
