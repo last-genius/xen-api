@@ -150,8 +150,8 @@ let dd_internal progress_cb base prezeroed verify_cert ?(proto = None) infile
                   let data = Bytes.to_string chunk.Chunk.data in
                   debug "sparse_dd: %s" data ;
                   try
-                    Scanf.sscanf data "Progress: %d" (fun progress ->
-                        progress_cb (Continuing (float_of_int progress /. 100.))
+                    Scanf.sscanf data "Progress: %f" (fun progress ->
+                        progress_cb (Continuing progress)
                     )
                   with e ->
                     Unix.kill (Forkhelpers.getpid pid) Sys.sigterm ;

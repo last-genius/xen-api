@@ -186,7 +186,7 @@ module Progress = struct
   (** Report progress complete to another program reading stdout *)
   let report fraction =
     if !machine_readable_progress then (
-      let s = Printf.sprintf "Progress: %.0f" (fraction *. 100.) in
+      let s = Printf.sprintf "Progress: %.3f" fraction in
       let data = Cstruct.create (String.length s) in
       Cstruct.blit_from_string s 0 data 0 (String.length s) ;
       Chunked.(marshal header (make ~sector:0L data)) ;
@@ -260,14 +260,13 @@ let start = Unix.gettimeofday ()
 
 (* Helper function to print nice progress info *)
 let progress_cb =
-  let last_percent = ref (-1) in
+  let last_fraction = ref (-1.) in
   function
-  | fraction ->
-      let new_percent = int_of_float (fraction *. 100.) in
-      if !last_percent <> new_percent then Progress.report fraction ;
-      if !last_percent / 10 <> new_percent / 10 then
-        debug "progress %d%%" new_percent ;
-      last_percent := new_percent
+  | new_fraction ->
+      if new_fraction -. !last_fraction > 0.001 then (
+        Progress.report new_fraction ;
+        last_fraction := new_fraction
+      )
 
 let _ =
   Vhd_format_lwt.File.use_unbuffered := true ;
