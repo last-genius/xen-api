@@ -1459,22 +1459,27 @@ let migrate_send' ~__context ~vm ~dest ~live:_ ~vdi_map ~vif_map ~vgpu_map
             Clock.Timer.start ~duration:Mtime.Span.((threshold + 5) * s)
           in
           let next_refresh = ref (just_refreshed ()) in
-          debug "%s: starting refreshing thread" __FUNCTION__ ;
+          debug "%s: starting refreshing thread for session '%s'" __FUNCTION__
+            (Ref.string_of session_id) ;
           while Atomic.get keep_refreshing do
             if Clock.Timer.has_expired !next_refresh then (
               refresh_session () ;
-              debug "%s: refresh_session called" __FUNCTION__ ;
+              debug "%s: refresh_session called for session '%s'" __FUNCTION__
+                (Ref.string_of session_id) ;
               next_refresh := just_refreshed ()
             ) ;
             Thread.delay 10.
           done ;
-          debug "%s: stopping refreshing thread" __FUNCTION__
+          debug "%s: stopping refreshing thread for session '%s'" __FUNCTION__
+            (Ref.string_of session_id)
         )
         ()
     in
     let new_vm =
       Fun.protect ~finally:(fun () ->
-          debug "%s: setting keep_refreshing to false" __FUNCTION__ ;
+          debug "%s: setting keep_refreshing to false for session '%s'"
+            __FUNCTION__
+            (Ref.string_of remote.session) ;
           Atomic.set keep_refreshing false
       )
       @@ fun () ->
