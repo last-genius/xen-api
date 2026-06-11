@@ -1363,6 +1363,7 @@ module MD = struct
     ; scheduler_params
     ; on_crash= on_action_behaviour vm.API.vM_actions_after_crash
     ; on_shutdown= on_action_behaviour vm.API.vM_actions_after_shutdown
+    ; on_suspend= on_action_behaviour vm.API.vM_actions_after_shutdown
     ; on_reboot= on_action_behaviour vm.API.vM_actions_after_reboot
     ; on_softreboot= on_action_behaviour vm.API.vM_actions_after_softreboot
     ; pci_msitranslate
@@ -3963,7 +3964,7 @@ let shutdown ~__context ~self timeout =
         (Db.VM.get_VBDs ~__context ~self)
   )
 
-let suspend ~__context ~self =
+let suspend ~__context ~self ~live =
   let@ __context = Context.with_tracing ~__context __FUNCTION__ in
   let queue_name = queue_of_vm ~__context ~self in
   transform_xenops_exn ~__context ~vm:self queue_name (fun () ->
@@ -4020,11 +4021,16 @@ let suspend ~__context ~self =
             let dbg = Context.string_of_task_and_tracing __context in
             info "xenops: VM.suspend %s to %s" id
               (d |> rpc_of disk |> Jsonrpc.to_string) ;
-            Client.VM.suspend dbg id d
+            Client.VM.suspend dbg id d live
             |> sync_with_task __context ~cancellable:false queue_name ;
             Events_from_xenopsd.wait queue_name dbg id () ;
-            Xapi_vm_lifecycle.assert_final_power_state_is ~__context ~self
-              ~expected:`Suspended ;
+
+            if not live then
+              Xapi_vm_lifecycle.assert_final_power_state_is ~__context ~self
+                ~expected:`Suspended ;
+
+            (* TODO: why is the VM still paused for a while before going
+               suspended ? *)
             if
               (not
                  (Xapi_vm_lifecycle.checkpoint_in_progress ~__context ~vm:self)
@@ -4131,6 +4137,18 @@ let s3resume ~__context ~self =
       let module Client = (val make_client queue_name : XENOPS) in
       debug "xenops: VM.s3resume %s" id ;
       Client.VM.s3resume dbg id |> sync_with_task __context queue_name ;
+      Events_from_xenopsd.wait queue_name dbg id ()
+  )
+
+let fast_resume ~__context ~self =
+  let@ __context = Context.with_tracing ~__context __FUNCTION__ in
+  let queue_name = queue_of_vm ~__context ~self in
+  transform_xenops_exn ~__context ~vm:self queue_name (fun () ->
+      let id = id_of_vm ~__context ~self in
+      let dbg = Context.string_of_task_and_tracing __context in
+      let module Client = (val make_client queue_name : XENOPS) in
+      debug "xenops: VM.fast_resume %s" id ;
+      Client.VM.fast_resume dbg id |> sync_with_task __context queue_name ;
       Events_from_xenopsd.wait queue_name dbg id ()
   )
 

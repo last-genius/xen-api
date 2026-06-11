@@ -200,6 +200,8 @@ module Domain = struct
             let dis = Xenctrl.domain_getinfolist xc 0 in
             List.fold_left
               (fun set x ->
+                (* TODO: this needs to account for soft reset / suspend as well
+                   or otherwise recreated on resume with introduceDomain *)
                 if not x.Xenctrl.shutdown then
                   IntSet.add x.Xenctrl.domid set
                 else

@@ -247,7 +247,7 @@ val resume :
   -> xc:Xenctrl.handle
   -> xs:Ezxenstore_core.Xenstore.Xs.xsh
   -> qemu_domid:int
-  -> domain_type:[`hvm | `pv | `pvh]
+  -> dm:Device.Profile.t
   -> domid
   -> unit
 (** Fast resume *)

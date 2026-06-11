@@ -2142,33 +2142,6 @@ module Dm_Common = struct
       try Some (int_of_string (xs.Xs.read (Service.PV_Vnc.tc_port_path domid)))
       with _ -> None
 
-  let signal (task : Xenops_task.task_handle) ~xs ~qemu_domid ~domid ?wait_for
-      ?param cmd =
-    let cmdpath = device_model_path ~qemu_domid domid in
-    Xs.transaction xs (fun t ->
-        t.Xst.write (cmdpath // "command") cmd ;
-        match param with
-        | None ->
-            ()
-        | Some param ->
-            t.Xst.write (cmdpath // "parameter") param
-    ) ;
-    match wait_for with
-    | Some state ->
-        let pw = cmdpath // "state" in
-        (* MTC: The default timeout for this operation was 20mins, which is way
-           too long for our software to recover successfully. Talk to Citrix
-           about this *)
-        let cancel = Qemu (qemu_domid, domid) in
-        let (_ : bool) =
-          cancellable_watch cancel
-            [Watch.value_to_become pw state]
-            [] task ~xs ~timeout:30. ()
-        in
-        ()
-    | None ->
-        ()
-
   let cmdline_of_disp ?domid info =
     let vga_type_opts x =
       let open Xenops_interface.Vgpu in
@@ -2326,9 +2299,6 @@ module Dm_Common = struct
     string_of_int domid :: "--syslog" :: args
 
   let gimtool_m = Mutex.create ()
-
-  let resume (task : Xenops_task.task_handle) ~xs ~qemu_domid domid =
-    signal task ~xs ~qemu_domid ~domid "continue" ~wait_for:"running"
 
   (* Called by every domain destroy, even non-HVM *)
   let stop ~xs ~qemu_domid ~vtpm domid =
@@ -2504,6 +2474,14 @@ module Backend = struct
       (** [assert_can_suspend xenstore xc] checks whether suspending is
             prevented by QEMU *)
 
+      val resume :
+           Xenops_task.task_handle
+        -> xs:Ezxenstore_core.Xenstore.Xs.xsh
+        -> qemu_domid:int
+        -> Xenctrl.domid
+        -> unit
+      (** [resume task xenstore qemu_domid xc] resumes a domain *)
+
       val suspend :
            Xenops_task.task_handle
         -> xs:Ezxenstore_core.Xenstore.Xs.xsh
@@ -2602,9 +2580,11 @@ module Backend = struct
 
       let assert_can_suspend ~xs:_ _ = ()
 
-      let suspend (task : Xenops_task.task_handle) ~xs ~qemu_domid domid =
-        with_tracing ~task ~name:"Qemu_none.Dm.suspend" @@ fun () ->
-        Dm_Common.signal task ~xs ~qemu_domid ~domid "save" ~wait_for:"paused"
+      let resume (_task : Xenops_task.task_handle) ~xs:_ ~qemu_domid:_ _domid =
+        ()
+
+      let suspend (_task : Xenops_task.task_handle) ~xs:_ ~qemu_domid:_ _domid =
+        ()
 
       let stop ~xs:_ ~qemu_domid:_ ~vtpm:_ _ = ()
 
@@ -3277,6 +3257,10 @@ module Backend = struct
 
       (* key not present *)
 
+      let resume (task : Xenops_task.task_handle) ~xs:_ ~qemu_domid:_ domid =
+        with_tracing ~task ~name:"Qemu_upstream_compat.Dm.resume" @@ fun () ->
+        qmp_send_cmd domid Qmp.Cont |> ignore
+
       let suspend (task : Xenops_task.task_handle) ~xs:_ ~qemu_domid:_ domid =
         with_tracing ~task ~name:"Qemu_upstream_compat.Dm.suspend" @@ fun () ->
         let as_msg cmd = Qmp.(Success (Some __LOC__, cmd)) in
@@ -3605,6 +3589,7 @@ module Backend = struct
 
       let after_suspend_image ~xs ~qemu_domid ~vtpm domid =
         (* device model not needed anymore after suspend image has been created *)
+        (* TODO: it is needed for live checkpointing still - or can we recover ? *)
         stop ~xs ~qemu_domid ~vtpm domid
 
       let pci_assign_guest ~xs ~index ~host =
@@ -3702,6 +3687,10 @@ module Dm = struct
   let assert_can_suspend ~xs ~dm domid =
     let module Q = (val Backend.of_profile dm) in
     Q.Dm.assert_can_suspend ~xs domid
+
+  let resume (task : Xenops_task.task_handle) ~xs ~qemu_domid ~dm domid =
+    let module Q = (val Backend.of_profile dm) in
+    Q.Dm.resume task ~xs ~qemu_domid domid
 
   let suspend (task : Xenops_task.task_handle) ~xs ~qemu_domid ~dm domid =
     let module Q = (val Backend.of_profile dm) in

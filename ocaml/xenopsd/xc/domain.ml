@@ -1608,18 +1608,19 @@ let build (task : Xenops_task.task_handle) ~xc ~xs ~store_domid ~console_domid
   build_post ~xc ~xs ~target_mib ~static_max_mib domid domain_type store_mfn
     store_port local_stuff vm_stuff
 
-let resume_post ~xc:_ ~xs domid =
+let resume_post ~task ~xc:_ ~xs ~qemu_domid ~dm domid =
   let dom_path = xs.Xs.getdomainpath domid in
   let store_mfn_s = xs.Xs.read (dom_path ^ "/store/ring-ref") in
   let store_mfn = Nativeint.of_string store_mfn_s in
   let store_port = int_of_string (xs.Xs.read (dom_path ^ "/store/port")) in
-  xs.Xs.introduce domid store_mfn store_port
+  debug "asvdebug: mfn: %nd, port %d" store_mfn store_port ;
+  xs.Xs.introduce domid store_mfn store_port ;
+  (* TODO: does varstored also need to be resumed ? *)
+  Device.Dm.resume task ~xs ~qemu_domid ~dm domid
 
-let resume (task : Xenops_task.task_handle) ~xc ~xs ~qemu_domid ~domain_type
-    domid =
+let resume (task : Xenops_task.task_handle) ~xc ~xs ~qemu_domid ~dm domid =
   Xenctrl.domain_resume_fast xc domid ;
-  resume_post ~xc ~xs domid ;
-  if domain_type = `hvm then Device.Dm.resume task ~xs ~qemu_domid domid
+  resume_post ~task ~xc ~xs ~qemu_domid ~dm domid
 
 type suspend_flag = Live | Debug
 
@@ -2235,8 +2236,9 @@ let suspend (task : Xenops_task.task_handle) ~xc ~xs ~domain_type ~is_uefi ~dm
   let open DD in
   let hvm = domain_type = `hvm in
   let uuid = get_uuid ~xc domid in
+  let live = List.mem Live flags in
   debug "VM = %s; domid = %d; suspend live = %b" (Uuidx.to_string uuid) domid
-    (List.mem Live flags) ;
+    live ;
   let open Suspend_image in
   let open Suspend_image.M in
   (* Suspend image signature *)
@@ -2295,7 +2297,9 @@ let suspend (task : Xenops_task.task_handle) ~xc ~xs ~domain_type ~is_uefi ~dm
   | Ok () ->
       debug "VM = %s; domid = %d; suspend complete" (Uuidx.to_string uuid) domid
   ) ;
-  if hvm then Device.Dm.after_suspend_image ~xs ~dm ~qemu_domid ~vtpm domid
+  if hvm && not live then
+    Device.Dm.after_suspend_image ~xs ~dm ~qemu_domid ~vtpm domid
+(* TODO: still need to send qmp.cont or something like that ? *)
 
 let send_s3resume ~xc domid =
   let uuid = get_uuid ~xc domid in

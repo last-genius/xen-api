@@ -665,6 +665,7 @@ let add' _copts x () =
             ; scheduler_params= {priority= None; affinity= []}
             ; on_crash= [Vm.Shutdown]
             ; on_shutdown= [Vm.Shutdown]
+            ; on_suspend= [Vm.Shutdown]
             ; on_reboot= [Vm.Start]
             ; on_softreboot= [Vm.Softreboot]
             ; pci_msitranslate
@@ -937,7 +938,7 @@ let suspend _copts disk x =
   in
   let open Vm in
   let vm, _ = find_by_name x in
-  Client.VM.suspend dbg vm.id (Local disk)
+  Client.VM.suspend dbg vm.id (Local disk) false
   |> wait_for_task dbg
   |> success_task ignore_task
 

@@ -338,7 +338,7 @@ type operation =
   | VM_poweroff of (Vm.id * float option)
   | VM_shutdown of (Vm.id * float option)
   | VM_reboot of (Vm.id * float option)
-  | VM_suspend of (Vm.id * data)
+  | VM_suspend of (Vm.id * data * bool) (* VM id * disk * live *)
   | VM_resume of (Vm.id * data)
   | VM_restore_vifs of Vm.id
   | VM_restore_devices of (Vm.id * bool)
@@ -1877,28 +1877,55 @@ let rec atomics_of_operation = function
       ; [VM_unpause id]
       ]
       |> List.concat
-  | VM_suspend (id, data) ->
+  | VM_suspend (id, data, live) ->
       (* If we've got a vGPU, then save its state to the same file *)
+      let flags =
+        if live then
+          [Live]
+        else
+          []
+      in
+
+      if live then
+        (* Preserve the VM for fast resume to be triggered by xapi later.
+           By default the VM would be destroyed after suspend otherwise *)
+        VM_DB.update_exn id (fun vm -> Some {vm with Vm.on_suspend= []})
+        |> ignore_bool ;
+
       let vgpu_data =
         if VGPU_DB.ids id = [] then
           None
         else
           Some data
       in
-      [
+      ([
+         ([
+            VM_hook_script
+              (id, Xenops_hooks.VM_pre_suspend, Xenops_hooks.reason__suspend)
+          ; VM_save (id, flags, data, vgpu_data)
+          ]
+         @
+         if live then
+           []
+         else
+           [
+             VM_hook_script
+               (id, Xenops_hooks.VM_pre_destroy, Xenops_hooks.reason__suspend)
+           ]
+         )
+       ]
+      @
+      if live then
+        []
+      else
         [
-          VM_hook_script
-            (id, Xenops_hooks.VM_pre_suspend, Xenops_hooks.reason__suspend)
-        ; VM_save (id, [], data, vgpu_data)
-        ; VM_hook_script
-            (id, Xenops_hooks.VM_pre_destroy, Xenops_hooks.reason__suspend)
+          atomics_of_operation (VM_shutdown (id, None))
+        ; [
+            VM_hook_script
+              (id, Xenops_hooks.VM_post_destroy, Xenops_hooks.reason__suspend)
+          ]
         ]
-      ; atomics_of_operation (VM_shutdown (id, None))
-      ; [
-          VM_hook_script
-            (id, Xenops_hooks.VM_post_destroy, Xenops_hooks.reason__suspend)
-        ]
-      ]
+      )
       |> List.concat
   | VM_resume (id, data) ->
       (* If we've got a vGPU, then save its state will be in the same file *)
@@ -2402,6 +2429,8 @@ let rec perform_atomic ~progress_callback ?result (op : atomic)
         vgpu_data extras
   | VM_fast_resume id ->
       debug "VM.fast_resume %s" id ;
+      VM_DB.update_exn id (fun vm -> Some {vm with Vm.on_suspend= [Shutdown]})
+      |> ignore_bool ;
       B.VM.resume t (VM_DB.read_exn id)
   | VM_delay (id, t) ->
       debug "VM %s: waiting for %.2f before next VM action" id t ;
@@ -2615,7 +2644,7 @@ and trigger_cleanup_after_failure op t =
   | VM_poweroff (id, _)
   | VM_reboot (id, _)
   | VM_shutdown (id, _)
-  | VM_suspend (id, _)
+  | VM_suspend (id, _, _)
   | VM_restore_vifs id
   | VM_restore_devices (id, _)
   | VM_resume (id, _) ->
@@ -2734,8 +2763,8 @@ and perform_exn ?result (op : operation) (t : Xenops_task.task_handle) : unit =
       debug "VM.shutdown %s" id ;
       perform_atomics (atomics_of_operation op) t ;
       VM_DB.signal id
-  | VM_suspend (id, _data) ->
-      debug "VM.suspend %s" id ;
+  | VM_suspend (id, _data, live) ->
+      debug "VM.suspend %s (live=%b)" id live ;
       perform_atomics (atomics_of_operation op) t ;
       VM_DB.signal id
   | VM_restore_vifs id ->
@@ -3258,7 +3287,7 @@ and perform_exn ?result (op : operation) (t : Xenops_task.task_handle) : unit =
               vm.Vm.on_crash
         | Some Needs_suspend ->
             warn "VM %s has unexpectedly suspended" id ;
-            [Vm.Shutdown]
+            vm.Vm.on_suspend
         | Some Needs_softreset ->
             vm.Vm.on_softreboot
         | None ->
@@ -3860,7 +3889,8 @@ module VM = struct
 
   let reboot _ dbg id timeout = queue_operation dbg id (VM_reboot (id, timeout))
 
-  let suspend _ dbg id disk = queue_operation dbg id (VM_suspend (id, Disk disk))
+  let suspend _ dbg id disk live =
+    queue_operation dbg id (VM_suspend (id, Disk disk, live))
 
   let resume _ dbg id disk = queue_operation dbg id (VM_resume (id, Disk disk))
 

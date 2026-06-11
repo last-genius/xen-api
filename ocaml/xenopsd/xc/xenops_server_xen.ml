@@ -2721,7 +2721,11 @@ module VM = struct
           None
     in
     let vm_has_shutdown () =
-      on_domain task vm (fun _ _ _ _ di -> di.Xenctrl.shutdown)
+      on_domain task vm (fun _ _ _ _ di ->
+          debug "asvdebug: shutdown: %b, shutdown_code: %d" di.Xenctrl.shutdown
+            di.Xenctrl.shutdown_code ;
+          di.Xenctrl.shutdown
+      )
     in
     Option.is_some
       (event_wait internal_updates task timeout is_vm_event vm_has_shutdown)
@@ -2808,6 +2812,7 @@ module VM = struct
     )
 
   let save task progress_callback vm flags data vgpu_data pre_suspend_callback =
+    let live = List.mem Live flags in
     let flags' = List.map (function Live -> Domain.Live) flags in
     on_domain task vm (fun xc xs (task : Xenops_task.task_handle) vm di ->
         let domain_type =
@@ -2900,52 +2905,67 @@ module VM = struct
               "VM = %s; domid = %d; Final memory usage of the domain = %Ld \
                pages"
               vm.Vm.id domid pages ;
-            (* Flush all outstanding disk blocks *)
-            let devices = Device_common.list_frontends ~xs domid in
-            let vmid = Storage.vm_of_domid (Some domid) in
-            let vbds =
-              List.filter
-                (fun dev ->
-                  match Device_common.(dev.frontend.kind) with
-                  | Device_common.Vbd _ ->
-                      true
-                  | _ ->
-                      false
-                )
-                devices
-            in
-            List.iter (Device.Vbd.hard_shutdown_request ~xs) vbds ;
-            List.iter (Device.Vbd.hard_shutdown_wait task ~xs ~timeout:30.) vbds ;
-            debug "VM = %s; domid = %d; Disk backends have all been flushed"
-              vm.Vm.id domid ;
-            List.iter
-              (fun vbds_chunk ->
-                Xapi_stdext_threads.Threadext.thread_iter
-                  (fun device ->
-                    let backend =
-                      match
-                        Rpcmarshal.unmarshal typ_of_backend
-                          (Device.Generic.get_private_key ~xs device _vdi_id
-                          |> Jsonrpc.of_string
-                          )
-                      with
-                      | Ok x ->
-                          x
-                      | Error (`Msg m) ->
-                          internal_error "Failed to unmarshal VBD backend: %s" m
-                    in
-                    let dp = Device.Generic.get_private_key ~xs device _dp_id in
-                    match backend with
-                    | None (* can never happen due to 'filter' above *)
-                    | Some (Local _) ->
-                        ()
-                    | Some (VDI path) ->
-                        let sr, vdi = Storage.get_disk_by_name task path in
-                        Storage.deactivate task dp sr vdi vmid
+
+            (* TODO: we need to either:
+              1) somehow flush but not shutdown
+              2) shutdown but recreate after resume
+
+              but currently we just don't flush and don't shutdown and hope
+              for the best
+              *)
+            if not live then (
+              (* Flush all outstanding disk blocks *)
+              let devices = Device_common.list_frontends ~xs domid in
+              let vmid = Storage.vm_of_domid (Some domid) in
+              let vbds =
+                List.filter
+                  (fun dev ->
+                    match Device_common.(dev.frontend.kind) with
+                    | Device_common.Vbd _ ->
+                        true
+                    | _ ->
+                        false
                   )
-                  vbds_chunk
-              )
-              (Xenops_utils.chunks 10 vbds) ;
+                  devices
+              in
+              List.iter (Device.Vbd.hard_shutdown_request ~xs) vbds ;
+              List.iter
+                (Device.Vbd.hard_shutdown_wait task ~xs ~timeout:30.)
+                vbds ;
+              debug "VM = %s; domid = %d; Disk backends have all been flushed"
+                vm.Vm.id domid ;
+              List.iter
+                (fun vbds_chunk ->
+                  Xapi_stdext_threads.Threadext.thread_iter
+                    (fun device ->
+                      let backend =
+                        match
+                          Rpcmarshal.unmarshal typ_of_backend
+                            (Device.Generic.get_private_key ~xs device _vdi_id
+                            |> Jsonrpc.of_string
+                            )
+                        with
+                        | Ok x ->
+                            x
+                        | Error (`Msg m) ->
+                            internal_error "Failed to unmarshal VBD backend: %s"
+                              m
+                      in
+                      let dp =
+                        Device.Generic.get_private_key ~xs device _dp_id
+                      in
+                      match backend with
+                      | None (* can never happen due to 'filter' above *)
+                      | Some (Local _) ->
+                          ()
+                      | Some (VDI path) ->
+                          let sr, vdi = Storage.get_disk_by_name task path in
+                          Storage.deactivate task dp sr vdi vmid
+                    )
+                    vbds_chunk
+                )
+                (Xenops_utils.chunks 10 vbds)
+            ) ;
             debug "VM = %s; domid = %d; Storing final memory usage" vm.Vm.id
               domid ;
             let _ =
@@ -3060,23 +3080,10 @@ module VM = struct
     )
 
   let resume t vm =
-    on_domain t vm (fun xc xs task _vm di ->
+    on_domain t vm (fun xc xs _task _vm di ->
         let domid = di.Xenctrl.domid in
         let qemu_domid = this_domid ~xs in
-        let domain_type =
-          match get_domain_type ~xs di with
-          | Vm.Domain_HVM ->
-              `hvm
-          | Vm.Domain_PV ->
-              `pv
-          | Vm.Domain_PVinPVH ->
-              `pvh
-          | Vm.Domain_PVH ->
-              `pvh
-          | Vm.Domain_undefined ->
-              failwith "undefined domain type: cannot resume"
-        in
-        Domain.resume task ~xc ~xs ~qemu_domid ~domain_type domid
+        Domain.resume t ~xc ~xs ~qemu_domid ~dm:(dm_of ~vm) domid
     )
 
   let s3resume t vm =

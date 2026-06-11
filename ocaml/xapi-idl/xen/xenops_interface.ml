@@ -849,8 +849,22 @@ module XenopsAPI (R : RPC) = struct
 
     let suspend =
       let disk_p = Param.mk ~name:"suspend_vdi" disk in
+      let live_p =
+        Param.mk ~name:"live"
+          ~description:
+            [
+              "when true, perform a live suspend (like during live migration), \
+               only pausing the VM to save last chunks of memory"
+            ]
+          Types.bool
+      in
       declare "VM.suspend" []
-        (debug_info_p @-> vm_id_p @-> disk_p @-> returning task_id_p err)
+        (debug_info_p
+        @-> vm_id_p
+        @-> disk_p
+        @-> live_p
+        @-> returning task_id_p err
+        )
 
     let resume =
       let disk_p = Param.mk ~name:"suspend_vdi" disk in

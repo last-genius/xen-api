@@ -543,7 +543,7 @@ let suspend ~__context ~vm =
   ) ;
 
   Xapi_gpumon.update_vgpu_metadata ~__context ~vm ;
-  Xapi_xenops.suspend ~__context ~self:vm ;
+  Xapi_xenops.suspend ~__context ~self:vm ~live:false ;
   let vm_uuid = Db.VM.get_uuid ~__context ~self:vm in
   let master_address = Pool_role.get_master_address_opt () in
   log_and_ignore_exn (fun () -> Rrdd.archive_rrd vm_uuid master_address)

@@ -101,6 +101,8 @@ module Make (Debug : DEBUG) = struct
             false
         | Some a', Some b' ->
             let open Xenctrl in
+            debug "asvdebug: domid %d, shutdown: %b/%b, shutdown_code: %d/%d"
+              a'.domid a'.shutdown b'.shutdown a'.shutdown_code b'.shutdown_code ;
             a'.shutdown <> b'.shutdown
             || a'.shutdown
                && b'.shutdown
@@ -183,10 +185,17 @@ module Make (Debug : DEBUG) = struct
                       )
                     ) else (
                       Actions.found_running_domain domid id ;
-                      (* A domain is 'running' if we know it has not shutdown or is waiting for soft reset *)
+                      (* A domain is 'running' if we know it has not shutdown
+                         or is waiting for soft reset.
+                         Count suspended VMs as 'running' as well - they
+                         might still be fast-resumed. If not, they will be
+                         cleaned up later *)
                       let running =
                         IntMap.mem domid domains'
-                        && ((not di.shutdown) || di.shutdown_code = 5)
+                        && ((not di.shutdown)
+                           || di.shutdown_code = 5
+                           || di.shutdown_code = 2
+                           )
                       in
                       match (IntSet.mem domid !watches, running) with
                       | true, true ->

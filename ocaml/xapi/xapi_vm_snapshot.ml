@@ -120,7 +120,7 @@ let checkpoint ~__context ~vm ~new_name =
           sr_records ;
         (* suspend the VM *)
         Xapi_gpumon.update_vgpu_metadata ~__context ~vm ;
-        Xapi_xenops.suspend ~__context ~self:vm
+        Xapi_xenops.suspend ~__context ~self:vm ~live:true
       with Api_errors.Server_error (_, _) as e -> raise e
   ) ;
   (* snapshot the disks and the suspend VDI *)
@@ -138,10 +138,9 @@ let checkpoint ~__context ~vm ~new_name =
       (None, None)
   in
   (* restore the power state of the VM *)
-  if power_state = `Running then (
-    debug "Performing a slow resume" ;
-    Xapi_xenops.resume ~__context ~self:vm ~start_paused:false ~force:false
-  ) ;
+  if power_state = `Running then
+    (* TODO: destroy the suspend VDI *)
+    Xapi_xenops.fast_resume ~__context ~self:vm ;
   match snap with
   | None -> (
     match err with

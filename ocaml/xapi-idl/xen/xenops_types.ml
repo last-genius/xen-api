@@ -167,6 +167,7 @@ module Vm = struct
     ; on_crash: action list
     ; on_shutdown: action list
     ; on_reboot: action list
+    ; on_suspend: action list [@default [Shutdown]]
     ; on_softreboot: action list [@default [Softreboot]]
     ; pci_msitranslate: bool
     ; pci_power_mgmt: bool

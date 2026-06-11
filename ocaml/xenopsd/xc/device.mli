@@ -372,16 +372,6 @@ module Dm : sig
   val get_tc_port :
     xs:Ezxenstore_core.Xenstore.Xs.xsh -> Xenctrl.domid -> int option
 
-  val signal :
-       Xenops_task.task_handle
-    -> xs:Ezxenstore_core.Xenstore.Xs.xsh
-    -> qemu_domid:int
-    -> domid:Xenctrl.domid
-    -> ?wait_for:string
-    -> ?param:string
-    -> string
-    -> unit
-
   val qemu_args :
        xs:Ezxenstore_core.Xenstore.Xs.xsh
     -> dm:Profile.t
@@ -414,7 +404,7 @@ module Dm : sig
   val assert_can_suspend :
     xs:Ezxenstore_core.Xenstore.Xs.xsh -> dm:Profile.t -> Xenctrl.domid -> unit
 
-  val suspend :
+  val resume :
        Xenops_task.task_handle
     -> xs:Ezxenstore_core.Xenstore.Xs.xsh
     -> qemu_domid:int
@@ -422,10 +412,11 @@ module Dm : sig
     -> Xenctrl.domid
     -> unit
 
-  val resume :
+  val suspend :
        Xenops_task.task_handle
     -> xs:Ezxenstore_core.Xenstore.Xs.xsh
     -> qemu_domid:int
+    -> dm:Profile.t
     -> Xenctrl.domid
     -> unit
 
