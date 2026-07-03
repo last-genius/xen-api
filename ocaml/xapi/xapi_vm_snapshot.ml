@@ -294,6 +294,11 @@ let revert_vbds ~__context ~rpc ~session_id ~snapshot ~vm =
 
     (* Disks without snapshot are left unattached after the revert is complete. *)
     let vm_disks_without_snapshot = vm_disks_all --- snap_disks_snapshot_of in
+    VDISet.iter
+      (fun x ->
+        debug "asvdebug, vm_disks_without_snapshot: %s" (Ref.string_of x)
+      )
+      vm_disks_without_snapshot ;
 
     vm_disks_all
     --- vm_disks_without_snapshot
