@@ -542,6 +542,16 @@
   yojson))
 
 (package
+ (name vhd_qcow_parsing)
+ (synopsis "Wrapper to parse VHD and QCOW headers to determine allocated
+           clusters")
+ (depends
+  (ocaml (>= "4.13.0"))
+  dune
+ )
+)
+
+(package
  (name vhd-format)
  (synopsis "Pure OCaml library to read/write VHD format data")
  (description "A pure OCaml library to read and write [vhd](http://en.wikipedia.org/wiki/VHD_(file_format)) format data, plus a simple command-line tool which allows vhd files to be interrogated, manipulated, format-converted and streamed to and from files and remote servers.")
