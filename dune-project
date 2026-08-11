@@ -490,6 +490,8 @@
   xmlm
   (xml-light2
    (= :version))
+  (vhd_qcow_parsing
+   (= :version))
   yojson
   (zstd
    (= :version))))
@@ -531,6 +533,8 @@
    (= :version))
   (vhd-format-lwt
    (= :version))
+  (vhd_qcow_parsing
+   (= :version))
   (xapi-idl
    (= :version))
   (xapi-log
@@ -540,6 +544,16 @@
   xenstore
   xenstore_transport
   yojson))
+
+(package
+ (name vhd_qcow_parsing)
+ (synopsis "Wrapper to parse VHD and QCOW headers to determine allocated
+           clusters")
+ (depends
+  (ocaml (>= "4.13.0"))
+  dune
+ )
+)
 
 (package
  (name vhd-format)
