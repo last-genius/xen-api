@@ -243,6 +243,8 @@ let stream_nbd _common c s prezeroed ~export ?(progress = no_progress_bar) () =
         (if prezeroed then 0L else s.size.empty)
     )
   in
+  D.debug "total_work: %Ld, s.size.copy: %Ld, prezeroed: %b" total_work
+    s.size.copy prezeroed ;
   let p = progress total_work in
 
   (if not prezeroed then expand_empty s else return s) >>= fun s ->
@@ -874,6 +876,26 @@ let make_stream common source relative_to source_format destination_format =
           (Failure
              (Printf.sprintf
                 "Failed to parse hybrid source: %s (expected raw_disk|vhd_disk)"
+                source
+             )
+          )
+  )
+  | "hybridqcow", "raw" -> (
+    (* expect source to be block_device:qcow *)
+    match split ~limit:2 ~sep:':' source with
+    | [raw; qcow] ->
+        let cluster_size, cluster_list =
+          Vhd_qcow_parsing.Qcow.parse_header_interval qcow
+        in
+        (* TODO: respect relative_to *)
+        Vhd_format_lwt.IO.openfile raw false >>= fun raw ->
+        Hybrid_input.qcow raw cluster_size cluster_list
+    | _ ->
+        fail
+          (Failure
+             (Printf.sprintf
+                "Failed to parse hybrid source: %s (expected \
+                 raw_disk|qcow_image)"
                 source
              )
           )
