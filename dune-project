@@ -224,6 +224,62 @@
  (name xapi-nbd))
 
 (package
+ (name nbd)
+ (depends
+  (ocaml (>= "4.08.0"))
+  (bisect_ppx (and :dev (>= "2.5.0")))
+  (dune (>= "2.7.0"))
+  (alcotest :with-test)
+  (alcotest-lwt :with-test)
+  (cstruct (>= "6.0.0"))
+  (io-page (>= "2.4.0"))
+  (mirage-block (>= "3.0.0"))
+  mirage-block-unix
+  (lwt (>= "2.7.0"))
+  lwt_log
+  (odoc :with-doc)
+  (ppx_cstruct (>= "3.1.0"))
+  (ppx_sexp_conv (>= "v0.9.0"))
+  rresult
+  sexplib
+  uri)
+ )
+
+(package
+ (name nbd-unix)
+ (depends
+  (ocaml (>= "4.08.0"))
+  bigarray-compat
+  (bisect_ppx (and :dev (>= "2.5.0")))
+  (dune (>= "2.7.0"))
+  cstruct-lwt
+  (io-page (>= "2.4.0"))
+  (lwt (>= "2.7.0"))
+  lwt_ssl
+  (mirage-block (>= "2.0.0"))
+  mirage-block-unix
+  (nbd (= :version))
+  (odoc :with-doc)
+  ssl)
+ )
+
+(package
+ (name nbd-tool)
+ (depends
+  (ocaml (>= "4.08.0"))
+  (dune (>= "2.7.0"))
+  (alcotest :with-test)
+  (alcotest-lwt :with-test)
+  (cmdliner (>= "1.1.0"))
+  (lwt (>= "2.7.0"))
+  lwt_log
+  mirage-block-unix
+  (nbd-unix (= :version))
+  (odoc :with-doc)
+  uri)
+ )
+
+(package
  (name xapi-log)
  (synopsis "A Logs library required by xapi")
  (description
