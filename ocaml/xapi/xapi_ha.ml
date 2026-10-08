@@ -1587,8 +1587,11 @@ let disable_internal __context =
     |> List.filter_map is_valid
   in
   let metadata_vdis =
-    List.map
-      (fun x -> Db.VDI.get_by_uuid ~__context ~uuid:x.Static_vdis.uuid)
+    List.filter_map
+      (fun x ->
+        try Some (Db.VDI.get_by_uuid ~__context ~uuid:x.Static_vdis.uuid)
+        with _ -> None
+      )
       (Xha_metadata_vdi.list_existing ())
   in
   redo_log_ha_disabled_during_runtime __context ;
