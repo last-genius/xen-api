@@ -68,22 +68,21 @@ let find_backend_device path =
         None
   with _ -> None
 
-(** [tapdisk_nbd_socket device] returns the path of the NBD server socket of
-    the tapdisk serving [device] *)
-let tapdisk_nbd_socket device =
+let tapdisk_of_device device =
   let path = find_backend_device device |> Option.value ~default:device in
   match Tapctl.of_device (Tapctl.create ()) path with
   | Some (tapdev, _, _) ->
-      Printf.sprintf "/var/run/blktap-control/nbd%d.%d"
-        (Tapctl.get_tapdisk_pid tapdev)
-        (Tapctl.get_minor tapdev)
+      (Tapctl.get_tapdisk_pid tapdev, Tapctl.get_minor tapdev)
   | None ->
       failwith (Printf.sprintf "No tapdisk found for %s (%s)" device path)
 
 (** [with_tapdisk_nbd_client device f] connects to the NBD server of the
     tapdisk serving [device] and applies [f] to the resulting NBD client *)
 let with_tapdisk_nbd_client device f =
-  let socket_path = tapdisk_nbd_socket device in
+  let pid, minor = tapdisk_of_device device in
+  let socket_path =
+    Printf.sprintf "/var/run/blktap-control/nbd%d.%d" pid minor
+  in
   Lwt_log.notice_f "Connecting to tapdisk NBD server %s" socket_path
   >>= fun () ->
   let fd = Lwt_unix.socket Lwt_unix.PF_UNIX Lwt_unix.SOCK_STREAM 0 in
@@ -120,6 +119,36 @@ module Tapdisk_client = struct
 
   let write t sector bufs = write t Int64.(mul sector (of_int sector_size)) bufs
 end
+
+(** [handoff_to_tapdisk fd device] passes the client connection [fd],
+    negotiated up to and including NBD_OPT_EXPORT_NAME, to the NBD server of
+    the tapdisk serving [device], and waits until tapdisk is done with it *)
+let handoff_to_tapdisk fd device =
+  let pid, minor = tapdisk_of_device device in
+  let socket_path =
+    Printf.sprintf "/var/run/blktap-control/nbdserver-new%d.%d" pid minor
+  in
+  Lwt_log.notice_f "Handing over client to tapdisk via %s" socket_path
+  >>= fun () ->
+  let conn = Lwt_unix.socket Lwt_unix.PF_UNIX Lwt_unix.SOCK_STREAM 0 in
+  Lwt.finalize
+    (fun () ->
+      Lwt_unix.connect conn (Lwt_unix.ADDR_UNIX socket_path) >>= fun () ->
+      (* tapdisk only logs the message, but needs one to accept the fd *)
+      let msg = "xapi-nbd" in
+      Lwt_unix.wait_write conn >>= fun () ->
+      let (_ : int) =
+        Xapi_stdext_unix.Unixext.send_fd_substring
+          (Lwt_unix.unix_file_descr conn)
+          msg 0 (String.length msg) []
+          (Lwt_unix.unix_file_descr fd)
+      in
+      (* tapdisk closes the connection once it is done with the client *)
+      Lwt.catch
+        (fun () -> Lwt_unix.read conn (Bytes.create 1) 0 1 >|= ignore)
+        (fun _ -> Lwt.return_unit)
+    )
+    (ignore_exn_delayed (fun () -> Lwt_unix.close conn))
 
 let with_attached_vdi vDI rpc session_id f =
   Lwt_log.notice "Looking up control domain UUID in xensource inventory"
@@ -161,8 +190,15 @@ let handle_connection fd tls_role =
     with_attached_vdi vdi_ref rpc session_id (fun filename ->
         Lwt.catch
           (fun () ->
-            with_tapdisk_nbd_client filename
-              (Nbd_unix.Server.serve t ~read_only:true (module Tapdisk_client))
+            match tls_role with
+            | None ->
+                (* Without TLS, tapdisk can serve the client connection itself *)
+                handoff_to_tapdisk fd filename
+            | Some _ ->
+                with_tapdisk_nbd_client filename
+                  (Nbd_unix.Server.serve t ~read_only:true
+                     (module Tapdisk_client)
+                  )
           )
           (fun _ ->
             Cleanup.Block.with_block filename
