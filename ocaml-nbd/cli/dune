@@ -1,0 +1,17 @@
+(executable
+ (modes byte exe)
+ (name main)
+ (public_name nbd-tool)
+ (package nbd-tool)
+ (libraries
+   cmdliner
+   fmt
+   lwt
+   lwt.unix
+   lwt_log
+   mirage-block
+   mirage-block-unix
+   nbd
+   nbd-unix
+   ssl
+   uri))
