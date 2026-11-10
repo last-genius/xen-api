@@ -51,7 +51,7 @@ jobs:
         with:
           path: ${{ github.workspace }}/compile_commands.json
 
-      - uses: whisperity/codechecker-analysis-action@c1fbda08799d91447c007e18db31e423ee37fccd
+      - uses: last-genius/CodeChecker-Action@34ea407a58f375489631496ba1741d72af43785e
         id: codechecker
         with:
           ctu: true
